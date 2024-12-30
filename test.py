@@ -106,7 +106,9 @@ import diimpy.bayesian_inversion as bayes
 #in the module bayesian_inversion.
 ###############################################################################
 
-perturbation_factors = bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/settings/perturbation_factors',iterations=100,save=False,which = 'test', seed = 1853,name='history.npy')
+perturbation_factors = bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data'\
+	,output_path = MODEL_HOME + '/settings/perturbation_factors',iterations=100,save=False\
+	,which = 'test', seed = 1853,name='history.npy')
 print(perturbation_factors[-1])
 
 ###############################################################################
@@ -135,15 +137,19 @@ for i in range(num_runs):
 #(stored in /settings/perturbation_factors) and the results using a neural network. 
 ###############################################################################
 
-perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
-perturbation_factors_NN = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(torch.float32).mean(axis=0)
+perturbation_factors = torch.tensor(np.load(MODEL_HOME + \
+	'/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
+perturbation_factors_NN = torch.tensor(np.load(MODEL_HOME + \
+	'/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(\
+	torch.float32).mean(axis=0)
 
 ###############################################################################
 #Using this two results, with the mcmc runs, we can make some plots to compare each other. For example:
 ###############################################################################
 
 import matplotlib.pyplot as plt
-constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
+constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],\
+	constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
 
 
 #mcmc_runs = mcmc_runs[:,2000:,:]
@@ -164,8 +170,10 @@ mcmc_percentile_84 = np.percentile(mcmc_runs,84,axis=0)
 
 fig_labels = ['(a)','(b)','(c)','(d)','(e)','(f)','(g)','(h)','(i)']
 names = ['$d_{\\text{CDOM}}$ [$\\text{m}^2(\\text{mgCDOM})^{-1}$]','$S_{\\text{CDOM}}$ [nm]','$Q_a$','$Q_b$',\
-             '$\Theta^{\\text{min}}_{\\text{chla}}$ [$\\text{mgChla}\\text{(mgC)}^{-1}$]','$\Theta^{\\text{0}}_{\\text{chla}}$  [$\\text{mgChla}\\text{(mgC)}^{-1}$]',\
-             '$\\beta$ [$\\text{mmol}\\text{m}^{-2}\\text{s}^{-1}$]','$\sigma$  [$\\text{mmol}\\text{m}^{-2}\\text{s}^{-1}$]','$b_{b,\\text{NAP}}$']
+             '$\Theta^{\\text{min}}_{\\text{chla}}$ [$\\text{mgChla}\\text{(mgC)}^{-1}$]',\
+	     '$\Theta^{\\text{0}}_{\\text{chla}}$  [$\\text{mgChla}\\text{(mgC)}^{-1}$]',\
+             '$\\beta$ [$\\text{mmol}\\text{m}^{-2}\\text{s}^{-1}$]',\
+	     '$\sigma$  [$\\text{mmol}\\text{m}^{-2}\\text{s}^{-1}$]','$b_{b,\\text{NAP}}$']
 which = 3
 fig,axs = plt.subplots(ncols=2,nrows=1,layout='constrained',width_ratios=[3/4,1/4])
 
@@ -173,7 +181,8 @@ axs[0].axhline( y = constant_values[which],linestyle='--',label='original value'
 print(mcmc_runs_mean)
 
 axs[0].axhline( y = mcmc_runs_mean[500:,which].mean(),linestyle='dashdot',label='mcmc relaxation mean',color='blue')
-axs[0].axhline( y = constant_values[which]*perturbation_factors_NN[5+which],linestyle='dashdot',label='CVAE result',color='#f781bf')
+axs[0].axhline( y = constant_values[which]*perturbation_factors_NN[5+which],linestyle='dashdot',\
+	label='CVAE result',color='#f781bf')
 
 
 
@@ -182,11 +191,13 @@ axs[0].plot(ynew,label='mcmc')
 
 ynew1 = scipy.ndimage.uniform_filter1d(mcmc_percentile_2_5[:,which], size=100)
 ynew2 = scipy.ndimage.uniform_filter1d(mcmc_percentile_98_5[:,which], size=100)
-axs[0].fill_between(range(3000), ynew1, ynew2,color='gray',zorder = 0.1,alpha=0.6,label = '95% confidence interval of mcmc')
+axs[0].fill_between(range(3000), ynew1, ynew2,color='gray',zorder = 0.1,alpha=0.6,\
+	label = '95% confidence interval of mcmc')
 
 ynew1 = scipy.ndimage.uniform_filter1d(mcmc_percentile_16[:,which], size=100)
 ynew2 = scipy.ndimage.uniform_filter1d(mcmc_percentile_84[:,which], size=100)
-axs[0].fill_between(range(3000), ynew1, ynew2,color='#377eb8',zorder = 0.1,alpha=0.8,label = '63% confidence interval of mcmc')
+axs[0].fill_between(range(3000), ynew1, ynew2,color='#377eb8',zorder = 0.1,alpha=0.8,\
+	label = '63% confidence interval of mcmc')
 
 
 
@@ -202,9 +213,11 @@ data = data[:,::280].flatten()
 data = data
 
 
-n,bins,patches = axs[1].hist(data,orientation='horizontal',bins=40,edgecolor='black',color='#377eb8',alpha=0.6,density=True)
+n,bins,patches = axs[1].hist(data,orientation='horizontal',bins=40,edgecolor='black',\
+	color='#377eb8',alpha=0.6,density=True)
 (mu, sigma) = scipy.stats.norm.fit(data)
-axs[1].plot(scipy.stats.norm.pdf(bins,loc=mu,scale=sigma),bins , linewidth=2,color='black',label='normal distribution\nmean: {:.3f}\nstd: {:.3f}'.format(mu,sigma))
+axs[1].plot(scipy.stats.norm.pdf(bins,loc=mu,scale=sigma),bins , linewidth=2,color='black',\
+	label='normal distribution\nmean: {:.3f}\nstd: {:.3f}'.format(mu,sigma))
 axs[1].legend()
 axs[1].text(-0.1,1.05,'(b)',transform = axs[1].transAxes,fontsize=20)
 axs[1].set_xlabel('Probability density')

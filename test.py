@@ -79,7 +79,7 @@ import diimpy.bayesian_inversion as bayes
 #We also want to optimize the forward model by optimizing his parameters, such that the inversion returns values close to observe data. For this, we also defined a loss function, OBS_loss, and minimize it. Since for each iteration of the minimization of OBS_loss, involves a train loop minimizing RRS_loss, we started by finding an approximation of the minimum of both by using alternate minimization. The function that does the alternate minimization is track_parameters, also in the module bayesian_inversion.
 ###############################################################################
 
-perturbation_factors = bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/plot_data/perturbation_factors',iterations=100,save=False,which = 'test', seed = 1853,name='history.npy')
+perturbation_factors = bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/settings/perturbation_factors',iterations=100,save=False,which = 'test', seed = 1853,name='history.npy')
 print(perturbation_factors[-1])
 
 ###############################################################################

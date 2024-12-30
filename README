@@ -11,7 +11,7 @@ the data is stored in binary files in NumPy .npy format. To access the data, rea
 
 $ python3
 $ >>> import numpy
-$ >>> file = numpy.load('settings/npy_data/test_labels.npy')
+$ >>> file = numpy.load('settings/npy_data/x_data_all.npy')
 
 The data will then be in a matrix, where each row represents a different date of data, and each column
 represents a different input. A description of each column is available in settings/npy_data/README.

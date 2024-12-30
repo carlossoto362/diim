@@ -1,0 +1,15 @@
+ConfigSpace==1.1.1
+constrained-linear-regression==0.0.4
+matplotlib>=3.7
+matplotlib-inline==0.1.7
+mdurl==0.1.2
+multiprocess==0.70.16
+networkx>=2.8.8
+numpy>=1.24
+pandas>=2
+ray>=2.1
+scipy>=1.1
+seaborn==0.13.2
+sympy==1.12
+pvlib==0.11.0
+tqdm==4.66.5

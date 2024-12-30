@@ -1,0 +1,142 @@
+Within the New Copernicus Capability for Trophic Ocean Networks (NECCTON) project,
+ we aim to improve the current data assimilation system by developing a method for accurately
+ estimating marine optical constituents from satellite derived Remote Sensing Reflectance.
+DOI:  https://doi.org/10.5194/gmd-2024-174.
+
+#############################################################################################
+##################################### DATA AVAILABILITY #####################################
+#############################################################################################
+All the data used for our work is contained in settings/npy_data. For easy accesibility, the
+data is stored in binary files in NumPy .npy format. To acces the data, read it with a python
+script like,
+
+       $python3
+       $>>>import numpy
+       $>>>file = numpy.load('settings/npy_data/test_labels.npy')
+       
+The data will be then a matrix, where each row is a diferent date of data, and each column is
+a diferent input. A description of each column in settings/npy_data/README.
+
+
+#############################################################################################
+##################################### MODULES DESCRIPTION ###################################
+######################################### (diimpy) ##########################################
+#############################################################################################
+
+
+The modules in diimpy containe all the scripts used for the present work:
+ 
+     -read_data_module.py: All the scripts use PyTorch and numpy for handling the data. This
+     module has classes and functions to read the data, and transform it to formats that make
+     it easier to work with, in conjunction with PyTorch tensors.
+
+     -Forward_model.py: The work deals with an inverse process. This module contains most of
+     the forward computations.
+
+     -bayesian_inversion.py: For the inversion computation, many approaches where tested. This
+     module has the functions to performe the bayesian inversion, togueder with alternate
+     minimization.
+
+     -sensitivity_analysis_and_mcmc_runs.py: Script used to study the sensitivy analysis of the
+     parameters of the model, run the mcmc and make plots of the sensitivy. The mcmc uses as
+     input the output of the alternate minimization, computed in the module 'bayesian_inversion.py'.
+
+     -CVAE_model_part_one.py / CVAE_model_part_two.py: Code used to train the neural network based
+     inversion model. Since this is the most comboluted part, I procede to explain with more
+     detail how they work. There are two main functions in the module CVAE_model_part_two, which are:
+     			     explore_hyperparameters(): Use the module ray[Tune] to search in the hyperparameter
+			     space for those that minimize a loss function on the validation set. The validation
+			     set is 10% of the training set, is selected at random for each iteration of the
+			     hyperparameter exploration. ray[Tune] uses the Bayesian Optimization HyperBand
+			     algorithm to search in an optimal way. The hyperparameters explored and values of
+			     the loss functions for each iteration are stored in a file called ray_tune, that by
+			     default is in $HOME/ray_tune. Then, the ray[Tune] module has functions to read this
+			     file, and select the one with the best score.
+
+    			     save_cvae_first_part(): After the exploration, this function reads the best
+			     hyperparameters and train the neural network with all the train data. Our model is
+			     composed of three parts, two of them are neural networks stored in settings/VAE_model,
+			     the third one is the forward model (diimpy/ForwardModel) of RRS. Considering the
+			     neural network components, model_first_part.pt (NN_1) is the state_dict of the
+			     first part of the neural network. This part was trained with the OASIM and Satellite
+			     data as input using the code CVAE_model_part_one.py, and the BOUSSOLE data as output.
+			     The idea of this part was to reduce the dimensionality of the input.
+			     model_second_part_final.pt (NN_2) is the second part, train in CVAE_model_part_two.py,
+			     whose input is NN_1 and output is the latent variables chla, nap and cdom. This is a
+			     probabilistic model, so using the main value of many runs is advisable.
+
+    			     In the forlder /settings/VAE_model, there is a second file,
+			     model_second_part_chla_centered.pt, which can be used as NN_2 instead of
+			     model_second_part_final.pt. It has the same hyperparameters, but with the difference
+			     that the output chla is equal to NN_1_chla + NN_2_chla, where NN_1_chla is the output
+			     of NN_1 that maps the input to the in situ data of chla, and NN_2_chla is a
+			     perturbation to NN_1_chla. It can be observed that by using this second model, the
+			     final results and parameters from the forward model RRS have lower RMSE for the chla
+			     values of the Test data. (To use chla_centered or not, use chla_centered=True/False
+			     in the class NN_second_layer()).
+			     
+     -plot_data_lognormal.py: code use to make all the plots used for our work, by the
+     exception of the sensitivity analisys plots.
+
+     -ModelOnePointFive.py: While exploring the best way of computing the inversion,
+     the code passed by many iterations. ModelOnePointFive (model1.5) is the
+     fifth iteration of the inversion process, exploiting vectoriced quantities, parallel
+     computing, lognormal uncertainties (originaly I attempted with gaussian noice), etc.
+     This is the final version used to compute the alternate minimization and the bayesian
+     inversion processes. The modules 'bayesian_inversion.py', and 'read_data_module.py'
+     are modular copyes of this code, plus some upgrades to make the code compatible with
+     future works.
+
+
+#############################################################################################
+##################################### SETTINGS ##############################################
+#############################################################################################
+
+The forlder settings contain all the necessary files to run the codes in diimpy:
+
+    -npy_data: as descrived in the section 'DATA AVAILABILITY', this folder has the train and
+    test data used for our work. 
+
+     -Jacobians: contained the derivatives of the functions bbp, kd and RRS with respect of
+     the parameters "perturbation_factors" for all the storical data available.
+     
+     -VAE_model: containes the state_dict of the NN models, the final one used was
+     model_second_part_chla_centered.pt, which uses model_first_part.pt.
+     
+     -perturbation_factors: The parameters of the model were perturbed multiplying
+     them by perturbation factors. This perturbation factors where optimiced using
+     alternate minimization, mcmc, and the SGVB framework (CVAE files). 
+
+     -cte_lambda.csv / cte.csv: As initial conditions for the parameters of the
+     model, we used literature values. The lambda dependent parameters are in
+     cte_lambda.csv, the lambda independent are in cte.csv. 
+
+ 
+
+#############################################################################################
+##################################### RUNING THE CODES ######################################
+#############################################################################################
+
+To run the codes, just make sure to have all the libraryes required, listed in file requirements.
+Also, make sure to have a global library with the path of diim, e.g. by runing,
+
+      $export DIIM_PATH=/path/to/DIIM
+
+If desired, creating a local python3 environment with conda or pip could be performed by runing
+
+   $python3 -m venv "./diim_env"
+   $diim_env/bin/pip install networkx==2.8.8
+   $diim_env/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+   $diim_env/bin/pip install -r requirements.txt
+
+A make file to make the previous steps has being tested only in a computer with Ubuntu 20.04.6 LTS bulsay, with
+python3 and pip3 installed. It creates the virtual environment for python3, and a variable
+for the home page.
+
+
+#############################################################################################
+############################################## TEST #########################################
+#############################################################################################
+An easy to run code was added as test, called test.py, to check if is working correcly and
+also as a guide of how the code works.
+

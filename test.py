@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import scipy
 import pandas as pd
 from scipy import stats
-import jupyprint as jp
 from datetime import datetime,timedelta
 from torch.utils.data import DataLoader,random_split
 import warnings
@@ -25,11 +24,10 @@ else:
     print("Missing local variable DIIM_PATH. \nPlease add it with '$:export DIIM_PATH=path/to/diim/model'.")
     sys.exit()
 
-import diim.read_data_module as rdm
+import diimpy.read_data_module as rdm
 
 
 data = rdm.customTensorData(data_path=MODEL_HOME + '/settings/npy_data',which='test',per_day = True,randomice=True,seed=1853,normilized_NN='scaling')
-#print(help(data))
 constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',my_device = my_device)
 
 print('printing column names of OASIM model data: ',data.x_column_names)
@@ -40,7 +38,7 @@ print('Printing dictionary with the constants of the model: ',constant)
 #We would also like to load the forward model, also stored in the diim library.
 ###############################################################################
 
-import diim.Forward_module as fm
+import diimpy.Forward_module as fm
 
 batch_size = data.len_data
 
@@ -73,15 +71,15 @@ print(RRS_OBS,RRS_PRED)
 #To start, we defined a train loop, which using the Adam altorithm, minimizes the loss function "RRS_loss". The train loop is in the module bayes_inversion.py
 ###############################################################################
 
-import diim.bayesian_inversion as bayes
-print(help(bayes.train_loop))
+import diimpy.bayesian_inversion as bayes
+#print(help(bayes.train_loop))
 
 
 ###############################################################################
 #We also want to optimize the forward model by optimizing his parameters, such that the inversion returns values close to observe data. For this, we also defined a loss function, OBS_loss, and minimize it. Since for each iteration of the minimization of OBS_loss, involves a train loop minimizing RRS_loss, we started by finding an approximation of the minimum of both by using alternate minimization. The function that does the alternate minimization is track_parameters, also in the module bayesian_inversion.
 ###############################################################################
 
-perturbation_factors = bayes.track_parameters(data_path = MODEL_HOME + '/npy_data',output_path = MODEL_HOME + '/plot_data/perturbation_factors',iterations=100,save=False,which = 'test', seed = 1853,name='history.npy')
+perturbation_factors = bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/plot_data/perturbation_factors',iterations=100,save=False,which = 'test', seed = 1853,name='history.npy')
 print(perturbation_factors[-1])
 
 ###############################################################################
@@ -89,10 +87,10 @@ print(perturbation_factors[-1])
 ###############################################################################
 
 num_runs = 40
-    mcmc_runs = np.empty((num_runs,3000,14))
+mcmc_runs = np.empty((num_runs,3000,14))
 
-    for i in range(num_runs):
-        mcmc_runs[i] = np.load(MODEL_HOME + '/mcmc/run_' + str(i)+'.npy')
+for i in range(num_runs):
+        mcmc_runs[i] = np.load(MODEL_HOME + '/experiments/mcmc/run_' + str(i)+'.npy')
 
         
 ###############################################################################        

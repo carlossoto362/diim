@@ -13,12 +13,18 @@ import os
 import sys
 
 ###############################################################################
-#We would also like to import a module to read the data we are going to use. The library is called read_data_module and is stored in the diimpy library. After importing it, let's select the test data to work with. We used the train data for work, while test data was left only for testing the results. In this module, let's use the test data since is a smaller set. The seed used for selecting the data was 1853.
+#We would also like to import a module to read the data we are going to use.
+#The library is called read_data_module and is stored in the diimpy library.
+#After importing it, let's select the test data to work with. We used the train
+#data for work, while test data was left only for testing the results.
+#In this module, let's use the test data since is a smaller set.
+#The seed used for selecting the data was 1853.
 ###############################################################################
 
 my_device = 'cpu'
 if 'DIIM_PATH' in os.environ:
-    HOME_PATH = MODEL_HOME = os.environ["DIIM_PATH"] #most of the codes have this lines, make sure DIIM_PATH is in your path. 
+    HOME_PATH = MODEL_HOME = os.environ["DIIM_PATH"] 
+#most of the codes have this lines, make sure DIIM_PATH is in your path. 
 else:
 
     print("Missing local variable DIIM_PATH. \nPlease add it with '$:export DIIM_PATH=path/to/diim/model'.")
@@ -27,8 +33,10 @@ else:
 import diimpy.read_data_module as rdm
 
 
-data = rdm.customTensorData(data_path=MODEL_HOME + '/settings/npy_data',which='test',per_day = True,randomice=True,seed=1853,normilized_NN='scaling')
-constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',my_device = my_device)
+data = rdm.customTensorData(data_path=MODEL_HOME + '/settings/npy_data',which='test',\
+	per_day = True,randomice=True,seed=1853,normilized_NN='scaling')
+constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',\
+	file2=MODEL_HOME + '/settings/cte.csv',my_device = my_device)
 
 print('printing column names of OASIM model data: ',data.x_column_names)
 print('printing column names of satellite data',data.y_column_names)
@@ -48,14 +56,20 @@ X,Y = data.__getitem__(0)
 def return_date(day):
   return datetime(year=2000,month=1,day=1) + timedelta(days = int(data.dates[0]))
 
-print("printing $E_{dir}, E_{dif}, \lambda, zenith, PAR$ for day" + " {}".format( return_date(data.dates[0]).strftime("%d/%m/%Y") ))
+print("printing $E_{dir}, E_{dif}, \lambda, zenith, PAR$ for day" + " {}".format(\
+	 return_date(data.dates[0]).strftime("%d/%m/%Y") ))
 print(X)
 
-print("printing $R_{RS,412.5},R_{RS,442.5},R_{RS,490},R_{RS,510},R_{RS,555}$ for day " + "{}".format( return_date(data.dates[0]).strftime("%d/%m/%Y") ))
+print("printing $R_{RS,412.5},R_{RS,442.5},R_{RS,490},R_{RS,510},R_{RS,555}$ for day "\
+ + "{}".format( return_date(data.dates[0]).strftime("%d/%m/%Y") ))
 print(Y)
 
 ###############################################################################
-#Now, the RRS depends also in (chla,NAP,CDOM), which, for now, we don't know. Let's define a random tensor, and use it to evaluate the function. We also need to specify the perturbation factors, which are values that modify the existing parameters. If we set all of them to 1, we would be using the parameters from the literature.
+#Now, the RRS depends also in (chla,NAP,CDOM), which, for now, we don't know.
+#Let's define a random tensor, and use it to evaluate the function. We also need
+#to specify the perturbation factors, which are values that modify the existing
+#parameters. If we set all of them to 1, we would be using the parameters from
+#the literature.
 ###############################################################################
 
 perturbation_factors = torch.ones(14, dtype=torch.float32)
@@ -66,9 +80,16 @@ RRS_PRED = model(X.unsqueeze(0),perturbation_factors_ = perturbation_factors,con
 print(RRS_OBS,RRS_PRED)
 
 ###############################################################################
-#The values are not close to the measured ones, because we used random numbers as constituents. In our work, we used a Bayesian framework to find the optical constituents that maximized the posterior distribution, p(z|y,x), where z are the optical constituents, chla,NAP,CDOM, y the satellite data, RRS, and x the OASIM model data, Edir,Edif,λ,zenith,PAR. Computationally, we defined a loss function, "RRS_loss" equal to −2log(p(z|y,x)), part of the operational method, and minimized the loss function using a fix set of parameters.
+#The values are not close to the measured ones, because we used random numbers
+#as constituents. In our work, we used a Bayesian framework to find the optical
+#constituents that maximized the posterior distribution, p(z|y,x), where z are
+#the optical constituents, chla,NAP,CDOM, y the satellite data, RRS, and x the
+#OASIM model data, Edir,Edif,λ,zenith,PAR. Computationally, we defined a loss
+#function, "RRS_loss" equal to −2log(p(z|y,x)), part of the operational method,
+#and minimized the loss function using a fix set of parameters.
 
-#To start, we defined a train loop, which using the Adam altorithm, minimizes the loss function "RRS_loss". The train loop is in the module bayes_inversion.py
+#To start, we defined a train loop, which using the Adam altorithm, minimizes
+#the loss function "RRS_loss". The train loop is in the module bayes_inversion.py
 ###############################################################################
 
 import diimpy.bayesian_inversion as bayes
@@ -76,14 +97,28 @@ import diimpy.bayesian_inversion as bayes
 
 
 ###############################################################################
-#We also want to optimize the forward model by optimizing his parameters, such that the inversion returns values close to observe data. For this, we also defined a loss function, OBS_loss, and minimize it. Since for each iteration of the minimization of OBS_loss, involves a train loop minimizing RRS_loss, we started by finding an approximation of the minimum of both by using alternate minimization. The function that does the alternate minimization is track_parameters, also in the module bayesian_inversion.
+#We also want to optimize the forward model by optimizing his parameters, such
+#that the inversion returns values close to observe data. For this, we also defined
+#a loss function, OBS_loss, and minimize it. Since for each iteration of the
+#minimization of OBS_loss, involves a train loop minimizing RRS_loss, we started
+#by finding an approximation of the minimum of both by using alternate minimization.
+#The function that does the alternate minimization is track_parameters, also
+#in the module bayesian_inversion.
 ###############################################################################
 
 perturbation_factors = bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/settings/perturbation_factors',iterations=100,save=False,which = 'test', seed = 1853,name='history.npy')
 print(perturbation_factors[-1])
 
 ###############################################################################
-#The Alternate Minimization manage to minimize both loss functions, RRS_loss and OBS_loss, but doesn't help us if we want to quantify the uncertainty. For that, we used the Metropolis algorithm to sample for the posterior, using e−(0.5)OBSloss as the model for the likelihood. Again, our likelihood depends in chla, nap and cdom, which are obtained by minimizing RRS_loss, so instead, we approximate the result by only performing a limited set of iterations. The final result is in the module sensitivity_analisys, together with the sensitivity analysis. Here we can save some time and load the MCMC runs, from the folder mcmc/ or mcmc/runs2/.
+#The Alternate Minimization manage to minimize both loss functions, RRS_loss
+#and OBS_loss, but doesn't help us if we want to quantify the uncertainty.
+#For that, we used the Metropolis algorithm to sample for the posterior, using e−(0.5)
+#OBSloss as the model for the likelihood. Again, our likelihood depends in chla,
+#nap and cdom, which are obtained by minimizing RRS_loss, so instead, we
+#approximate the result by only performing a limited set of iterations.
+#The final result is in the module sensitivity_analisys, together with the
+#sensitivity analysis. Here we can save some time and load the MCMC runs,
+#from the folder mcmc/ or mcmc/runs2/.
 ###############################################################################
 
 num_runs = 40
@@ -94,7 +129,10 @@ for i in range(num_runs):
 
         
 ###############################################################################        
-#In addition, we also found values for the parameters using a framework called SGVB, which for now, I'm only going to mention that involves training a Neural Network. So, we can compare the mcmc parameters, the result of the Alternate Minimization (stored in /settings/perturbation_factors) and the results using a neural network. 
+#In addition, we also found values for the parameters using a framework called SGVB,
+#which for now, I'm only going to mention that involves training a Neural Network.
+#So, we can compare the mcmc parameters, the result of the Alternate Minimization
+#(stored in /settings/perturbation_factors) and the results using a neural network. 
 ###############################################################################
 
 perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)

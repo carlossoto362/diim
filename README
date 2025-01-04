@@ -121,7 +121,7 @@ A makefile to automate the previous steps has been tested only on a computer wit
  and sets a variable for the home page.
 
 #############################################################################################
-################################# TEST AND REPRODUCIBILITY ##################################
+################################# HOW TO TEST AND REPRODUCE #################################
 #############################################################################################
 
 A simple test script called test.py has been added to check if everything is working correctly

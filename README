@@ -121,8 +121,16 @@ A makefile to automate the previous steps has been tested only on a computer wit
  and sets a variable for the home page.
 
 #############################################################################################
-############################################## TEST #########################################
+################################# TEST AND REPRODUCIBILITY ##################################
 #############################################################################################
 
 A simple test script called test.py has been added to check if everything is working correctly
- and also serves as a guide for how the code works.
+ and also serves as a guide for how the code works (read the comments in the script).
+
+For a longer and detailed description on how to reproduce the results in the paper, run the 
+script reproduce.py, by runing:
+
+>>>python3 reproduce.py [-h|-a|-b|-m|-n]
+
+Use -h for help, -a for all, -b for only the bayes part, -m for only the mcmc part and -n for 
+only the neural network part.

@@ -17,6 +17,7 @@ from multiprocessing.pool import Pool
 import matplotlib.colors as mcolors
 from torch import nn
 from diimpy.CVAE_model_part_two import NN_second_layer
+from tqdm import tqdm
 
 
 if 'DIIM_PATH' in os.environ:
@@ -302,7 +303,7 @@ def track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path =
     p_past_parameters = torch.empty((iterations,14))
 
     scheduler_parameters = torch.optim.lr_scheduler.ReduceLROnPlateau(Parameter_optimizer, 'min')
-    for i in range(iterations):
+    for i in tqdm(range(iterations)):
 
         parameters_iter_time = time.time()
         
@@ -357,7 +358,7 @@ def track_alphas(output_path = MODEL_HOME + '/experiments/results_bayes_lognorma
     batch_size = data.len_data
     dataloader = DataLoader(data, batch_size=batch_size, shuffle=False)
 
-    for alpha in np.linspace(0.1,10,20):
+    for alpha in tqdm(np.linspace(0.1,10,20)):
         s_a = s_a_*alpha
         model = fm.Forward_Model(num_days=batch_size).to(my_device)
         model.perturbation_factors = perturbation_factors

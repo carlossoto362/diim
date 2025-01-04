@@ -569,6 +569,8 @@ if __name__ == '__main__':
     betas1 = best_result_config['betas1'] 
     betas2 = best_result_config['betas2']
     dk_alpha = best_result_config['dk_alpha']
+    print(best_result_config)
+    sys.exit()
 
 
     my_device = 'cpu'

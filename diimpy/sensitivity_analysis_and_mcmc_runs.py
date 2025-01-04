@@ -241,7 +241,7 @@ def saving_mcmc(input_):
 def plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy'):
     
     perturbation_factors_history_NN = np.load(perturbation_path + '/'+vae_name)[-300:].mean(axis=1)
-    perturbation_factors_history_lognormal =np.load(perturbation_path + '/perturbation_factors_history_lognormal.npy')[-1]
+    perturbation_factors_history_lognormal =np.load(perturbation_path + '/perturbation_factors_history_AM_final.npy')[-1]
     perturbation_factors_mean = np.load(perturbation_path + '/perturbation_factors_mean_mcmc.npy')
     perturbation_factors_std = np.load(perturbation_path + '/perturbation_factors_std_mcmc.npy')
     constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv')
@@ -400,7 +400,7 @@ def autocorr(x,lags):
         corr = [1. if np.isnan(c) else c for c in corr ] #worst case scenario, they are correlated. 
         return np.array(corr)
 
-def parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False):
+def parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False,constant_values=None,perturbation_factors = None,perturbation_factors_NN = None,fig_labels = None):
 
     if plot==True:
         fig,axs = plt.subplots(ncols=3,nrows=3,layout='constrained')
@@ -592,9 +592,9 @@ if __name__ == '__main__':
     
     
     fig_labels = ['(a)','(b)','(c)','(d)','(e)','(f)','(g)','(h)','(i)']
-    names = ['$d_{\\text{CDOM}}$ [$\\text{m}^2(\\text{mgCDOM})^{-1}$]','$S_{\\text{CDOM}}$ [nm]','$Q_a$','$Q_b$',\
-             '$\Theta^{\\text{min}}_{\\text{chla}}$ [$\\text{mgChla}\\text{(mgC)}^{-1}$]','$\Theta^{\\text{0}}_{\\text{chla}}$  [$\\text{mgChla}\\text{(mgC)}^{-1}$]',\
-             '$\\beta$ [$\\text{mmol}\\text{m}^{-2}\\text{s}^{-1}$]','$\sigma$  [$\\text{mmol}\\text{m}^{-2}\\text{s}^{-1}$]','$b_{b,\\text{NAP}}$']
+    names = ['$d_{\mathrm{CDOM}}$ [$\mathrm{m}^2(\mathrm{mgCDOM})^{-1}$]','$S_{\mathrm{CDOM}}$ [nm]','$Q_a$','$Q_b$',\
+             '$\Theta^{\mathrm{min}}_{\mathrm{chla}}$ [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]','$\Theta^{\mathrm{0}}_{\mathrm{chla}}$  [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]',\
+             '$\\beta$ [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$\sigma$  [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$b_{b,\mathrm{NAP}}$']
     which = 3
     fig,axs = plt.subplots(ncols=2,nrows=1,layout='constrained',width_ratios=[3/4,1/4])
 
@@ -645,7 +645,7 @@ if __name__ == '__main__':
     mcmc_runs = mcmc_runs[:,2000:,:]
 
 
-    parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=False,table=True)
+    parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=False,table=True,constant_values=constant_values,perturbation_factors = perturbation_factors,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels)
     
     plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')
             

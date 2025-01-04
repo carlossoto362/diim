@@ -20,7 +20,7 @@ import tempfile
 import torch.distributed as dist
 import sys
 
-from diimpy.Forward_Module import *
+from diimpy.Forward_module import *
 from diimpy.read_data_module import *
 
 import warnings

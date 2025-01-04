@@ -1308,7 +1308,7 @@ def track_alphas(output_path = HOME_PATH + '/results_bayes_lognormal_logparam/al
     data_path = HOME_PATH + '/npy_data'
 
     data = customTensorData(data_path=data_path,which='all',per_day = True,randomice=False)
-    perturbation_factors = torch.tensor(np.load(perturbation_path + '/perturbation_factors_history_lognormal.npy')[-1]).to(torch.float32)
+    perturbation_factors = torch.tensor(np.load(perturbation_path + '/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
     my_device = 'cpu'
     constant = read_constants(file1='cte_lambda.csv',file2='cst.csv',my_device = my_device)
 

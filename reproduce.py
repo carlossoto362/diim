@@ -34,7 +34,7 @@ def argument():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument( '-a',
                          action='store_true',
-                         help='Interactive script, use it to have a gided tour on how to reproduce the results.'
+                         help='Interactive script, use it to have a guided tour on how to reproduce the results.'
     )
     group.add_argument('-b',
                         action='store_true',
@@ -529,7 +529,7 @@ if __name__ ==  '__main__':
         if args.n:
             NN_part()
         print(interactive_cat)
-        iprint('Thank you for reading these interactive gide on how to reproduce the results from the paper ^^')
+        iprint('Thank you for reading these interactive guide on how to reproduce the results from the paper ^^')
                 
             
     except KeyboardInterrupt:

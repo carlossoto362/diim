@@ -14,7 +14,7 @@ create_venv:
 	if [ -z "$$ENVDIR" ]; then \
 		ENVDIR=$(PWD); \
 		echo "Using the current directory"; \
-		$(PYTHON_VERSION) -m venv "$$ENVDIR/diim_env"; \
+		python3 -m venv "$$ENVDIR/diim_env"; \
                 echo "Virtual environment created in $$ENVDIR/diim_env"; \
 	else \
 		mkdir -p "$$ENVDIR"; \

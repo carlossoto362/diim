@@ -13,20 +13,17 @@ DOI: https://doi.org/10.5194/gmd-2024-174.
 ######################################## REQUIREMENTS #######################################
 #############################################################################################
 
-The scripts for this work were made in python3, tested in python>=3.8.
-For the automatic installation, is required to have a Darwin of Linux prompt, as well as
-pip to install the requirements. All the libraryes required are listed in the file
-requirements.txt.
-
+The scripts for this work were written in Python 3 and tested in Python >= 3.8.
+For automatic installation, a Darwin or Linux prompt is required, as well as pip to install
+the requirements. All the libraries required are listed in the file requirements.txt.
 
 #############################################################################################
 ##################################### HOW TO INSTALL DIIM ###################################
 #############################################################################################
 
-A makefile has been tested for python=3.8.9, python3=3.9.6 and python3.12.7. It creates a virtual environment
-with all the python3 libraries and adds in $SHRC=.bashrc or .zshrc, the path to diim, as well as to the
-diim enviroment. To create it, run
-
+A Makefile has been tested with Python 3.8.9, Python 3.9.6, and Python 3.12.7.
+It creates a virtual environment with all the Python 3 libraries and adds the path to diim,
+as well as the diim environment, to $SHRC (.bashrc or .zshrc):
      $ make
      $ source $HOME/$SHRC
      $ source $/path/to/diim/environment/bin/activate
@@ -35,14 +32,14 @@ To add the python version you want to use, add
 
      $make PYTHON_VERSION=python3.8
 
-If for some reason, the make file is not an option, e.g. you are using conda to install the
-dependencies, you have to make sure all required libraries are installed, as listed in the
-requirements.txt file, and the libraries networkx>=2.8.8, torch, torchvision and torchaudio.
-You also have to set a global variable as:
+If, for some reason, the Makefile is not an option (e.g., you are using conda to install
+the dependencies), you must ensure that all required libraries are installed, as listed
+in the requirements.txt file, along with the libraries networkx >= 2.8.8, torch, torchvision,
+and torchaudio. You also need to set a global variable as:
 
 	$ export DIIM_PATH=/path/to/DIIM
 
-For compleatness, I list here the libraries requiared for all the scripts to work:
+For completeness, I list here the libraries required for all the scripts to work:
 
     networkx>=2.8.8
     torch

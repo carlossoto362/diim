@@ -120,6 +120,7 @@ def bayesian_part():
             
     iprint('Finally, we run the inversion using the best alpha and the optimal perturbation factors to obtain the historical optical constituents along with their uncertainties.')
     iprint('Would you like to run this part? (yes/no)')
+    results_AM_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam' 
     flag=iflag()
     if flag == 'yes':
         iprint('This may take a bit of time...')
@@ -177,6 +178,7 @@ def bayesian_part():
                                   num_days=batch_size,constant = constant,perturbation_factors_ = perturbation_factors, scheduler = True)
         
         output_path = MODEL_HOME+'/settings/reproduce/results_AM'
+        results_AM_path = output_path
         np.save(output_path + '/X_hat.npy',output['X_hat'])
         np.save(output_path + '/kd_hat.npy',output['kd_hat'])
         np.save(output_path + '/bbp_hat.npy',output['bbp_hat'])
@@ -186,12 +188,12 @@ def bayesian_part():
     iprint('We can also plot these results, along with the output of the neural network (explained in the forward step), using the module plot_data_lognormal.py')
     cprint("from diimpy import plot_data_lognormal as pdl")
     
-    cprint("""pdl.plot_chla(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam',\
+    cprint("""pdl.plot_chla(input_data_path = results_AM_path,\
               figname = MODEL_HOME + '/experiments/chla_lognormal_data_chla_centered.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
               statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
               third_data_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',log_scale=True)
     """)
-    pdl.plot_chla(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam',\
+    pdl.plot_chla(input_data_path = results_AM_path,\
               figname = MODEL_HOME + '/experiments/chla_lognormal_data_chla_centered.pdf',save=False,date_init = datetime(year=2005,month=1,day=1),\
               statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
               third_data_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',log_scale=True)

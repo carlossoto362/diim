@@ -13,7 +13,7 @@ DOI: https://doi.org/10.5194/gmd-2024-174.
 ######################################## REQUIREMENTS #######################################
 #############################################################################################
 
-The scripts for this work were made in python3, tested in python=3.8.9 and python=3.9.6.
+The scripts for this work were made in python3, tested in python>=3.8.
 For the automatic installation, is required to have a Darwin of Linux prompt, as well as
 pip to install the requirements. All the libraryes required are listed in the file
 requirements.txt.
@@ -23,48 +23,48 @@ requirements.txt.
 ##################################### HOW TO INSTALL DIIM ###################################
 #############################################################################################
 
-A makefile has been tested for python=3.8.9 and python3=3.9.6. It creates a virtual environment
-with all the python3 libraries and adds in $SHRC=.bashrc or .zshrc the path to diim, as well as to the
+A makefile has been tested for python=3.8.9, python3=3.9.6 and python3.12.7. It creates a virtual environment
+with all the python3 libraries and adds in $SHRC=.bashrc or .zshrc, the path to diim, as well as to the
 diim enviroment. To create it, run
 
      $ make
      $ source $HOME/$SHRC
      $ source $/path/to/diim/environment/bin/activate
 
+To add the python version you want to use, add
+
+     $make PYTHON_VERSION=python3.8
+
 If for some reason, the make file is not an option, e.g. you are using conda to install the
 dependencies, you have to make sure all required libraries are installed, as listed in the
-requirements.txt file. You also have to set a global variable as:
+requirements.txt file, and the libraries networkx>=2.8.8, torch, torchvision and torchaudio.
+You also have to set a global variable as:
 
 	$ export DIIM_PATH=/path/to/DIIM
 
-If desired, you can create a local Python 3 environment with conda or pip by running:
+For compleatness, I list here the libraries requiared for all the scripts to work:
 
-	$ python3 -m venv "./diim_env"
-	$ diim_env/bin/pip install networkx==2.8.8
-	$ diim_env/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-	$ diim_env/bin/pip install -r requirements.txt
-
-	      
-
-
-
-#############################################################################################
-##################################### INSTALLING DIIM ###################################
-#############################################################################################
-
-To run the codes, make sure all required libraries are installed, as listed in the
-requirements.txt file. You can also set a global library path for diim by running:
-
-	$ export DIIM_PATH=/path/to/DIIM
-
-If desired, you can create a local Python 3 environment with conda or pip by running:
-
-	$ python3 -m venv "./diim_env"
-	$ diim_env/bin/pip install networkx==2.8.8
-	$ diim_env/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-	$ diim_env/bin/pip install -r requirements.txt
-
-
+    networkx>=2.8.8
+    torch
+    torchvision
+    torchaudio
+    ConfigSpace>=1.1.1
+    constrained-linear-regression>=0.0.4
+    matplotlib>=3.7
+    matplotlib-inline>=0.1.7
+    mdurl>=0.1.2
+    multiprocess>=0.70.16
+    networkx>=2.8.8
+    numpy>=1.24
+    pandas>=2
+    ray>=2.1
+    scipy>=1.1
+    seaborn>=0.13.2
+    sympy>=1.12
+    pvlib>=0.11.0
+    tqdm>=4.66.5
+    pyarrow
+    tensorboardX
 
 #############################################################################################
 ##################################### DATA AVAILABILITY #####################################

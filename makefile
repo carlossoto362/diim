@@ -45,7 +45,7 @@ add_bashrc_line:
 
 setup: requirements.txt
 	echo $(ENVDIR)
-	$(ENVDIR)/diim_env/bin/pip install networkx==2.8.8
+	$(ENVDIR)/diim_env/bin/pip install networkx>=2.8.8
 	$(ENVDIR)/diim_env/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 	$(ENVDIR)/diim_env/bin/pip install -r requirements.txt
 	cp -r ./diimpy $(ENVDIR)/diim_env/lib/$(PYTHON_VERSION_)/site-packages/

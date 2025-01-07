@@ -103,8 +103,7 @@ def bayesian_part():
     print('')
 
     iprint('To recreate the paper, we first run alternate minimization with an approximately uniform prior (alpha >> 1).')
-    iprint('''Would you like to run this part? (yes/no)
-    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
+    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
     flag=iflag()
     if flag == 'yes':
         iprint('This part saves the history of perturbation_factors_used in DIIM_PATH + "/settings/reproduce/perturbation_factors/perturbation_factors_history_new.pt"')
@@ -115,8 +114,7 @@ def bayesian_part():
 
             
     iprint('With these perturbation factors, we tuned the prior parameter alpha (see the paper, Appendix B). This step is necessary because, for each day, the inversion is performed using only five wavelengths. With such limited data, the prior significantly influences the uncertainty. Our approach to tuning alpha is similar to Bayesian model specification, where, assuming Gaussianity, the best model balances fitting the data and minimizing individual uncertainties.')
-    iprint('''Would you like to run this part? (yes/no)
-    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
+    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
     flag=iflag()
     if flag == 'yes':
         iprint('This step saves the output of the Bayesian minimization with the different α values in DIIM_PATH + "/settings/reproduce/alphas". For this step, we used the perturbation factors from the previous step, specifically the ones saved in DIIM_PATH + "/settings/perturbation_factors/perturbation_factors_history_AM_test.npy".')
@@ -127,8 +125,8 @@ def bayesian_part():
 
             
     iprint('Finally, we run the inversion using the best alpha and the optimal perturbation factors to obtain the historical optical constituents along with their uncertainties.')
-    iprint('''Would you like to run this part? (yes/no)
-    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
+
+    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
     results_AM_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam' 
     flag=iflag()
     if flag == 'yes':
@@ -275,9 +273,7 @@ This function calculates the Jacobians at the specified perturbation_factors. ""
                              title='Sensitivity of the parameters with the literature values')
 
     iprint('Next, we run an MCMC algorithm with initial conditions close to the output of the alternate minimization (AM). We expect this output to be close to the mode of the distribution, which would result in a small tail to cut from the MCMC chain.')
-    iprint('''Would you like to run this part? (yes/no)
-    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
-
+    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
     num_runs = 40
     output_path = MODEL_HOME + '/experiments/mcmc/'
     
@@ -489,8 +485,7 @@ The state dictionary of the neural network after training is saved in DIIM_PATH 
 
     iprint('To tune the parameters, the function used was >>>cvae_two.explore_hyperparameters(). Once Ray Tune explores the possible parameters, the function >>>save_cvae_first_part() loads them and trains the neural network with all the training data (to tune the parameters, the neural network was trained with 90% of the training data). The trained state dictionary is then stored in DIIM_PATH + "/settings/VAE_model/model_second_part_chla_centered.pt. The names are the same for training the first part and the second part of the neural network. Finally, the output can be stored.')
     iprint('Finally, you can save the results to use them in the future.')
-    iprint('''Would you like to run this part? (yes/no)
-    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
+    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
     flag=iflag()
     if flag == 'yes':
 

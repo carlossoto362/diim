@@ -221,10 +221,13 @@ class mcmc_class():
         self.history[iteration] = self.current_position
 
 def saving_mcmc(input_):
+
     j = input_[0]
     perturbation_factors = input_[1]
     constant = input_[2]
     chla_hat = input_[3]
+    output_path = input_[4]
+    print('saving run', j,'...')
         
     init_time = time.time()
     num_iterations = 3000
@@ -234,8 +237,8 @@ def saving_mcmc(input_):
     resulting_mcmc = list(map(mcmc.step,np.arange(num_iterations)))
         
         
-    np.save(MODEL_HOME + '/experiments/mcmc/runs2/run_' + str(j)+'.npy',mcmc.history.numpy())
-    print(MODEL_HOME + '/experiments/mcmc/runs2/run_' + str(j)+'.npy saved, time', (time.time() - init_time) )
+    np.save(output_path + '/run_' + str(j)+'.npy',mcmc.history.numpy())
+    print(output_path + '/run_' + str(j)+'.npy saved, time', (time.time() - init_time) )
 
 
 def plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy'):
@@ -458,7 +461,7 @@ def parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=T
                                                                                                                ks_pvalue[which]))
 
 
-def mcmc():
+def mcmc(output_path = MODEL_HOME + '/experiments/mcmc/'):
     my_device = 'cpu'
     precision = torch.float32
     perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
@@ -495,7 +498,7 @@ def mcmc():
 
     z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model_NN(X) #we are working with \lambda as imput, but the NN dosent use it. 
     mu_z = mu_z* model_NN.y_mul[0] + model_NN.y_add[0]
-    list(map(saving_mcmc,[(j,perturbation_factors,constant,mu_z.unsqueeze(1)) for j in range(20)]))
+    list(map(saving_mcmc,[(j,perturbation_factors,constant,mu_z.unsqueeze(1),output_path) for j in range(20)]))
                 
 
 
@@ -523,23 +526,9 @@ if __name__ == '__main__':
 
 
     model = Forward_Model(num_days=1,learning_chla = False,learning_perturbation_factors = False).to(my_device)
-    perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_lognormal.npy')[-1]).to(torch.float32)
     perturbation_factors = torch.ones(14)
+    
     #jacobian_rrs,jacobian_kd,jacobian_bbp = compute_jacobians(model,X,mu_z,perturbation_factors,constant=constant) 
-    #np.save(MODEL_HOME + '/settings/Jacobians/jacobian_rrs_initialparam_lognormalresults.npy',jacobian_rrs.numpy())
-    #np.save(MODEL_HOME + '/settings/Jacobians/jacobian_kd_initialparam_lognormalresults.npy',jacobian_kd.numpy())
-    #np.save(MODEL_HOME + '/settings/Jacobians/jacobian_bbp_initialparam_lognormalresults.npy',jacobian_bbp.numpy())
-
-    
-    
-    jacobian_rrs = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_rrs_lognormalparam_lognormalresults.npy')) #drrs/depsiloni
-    jacobian_kd = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_kd_lognormalparam_lognormalresults.npy'))
-    jacobian_bbp = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_bbp_lognormalparam_lognormalresults.npy'))
-
-
-        
-    #sensitivity_boxplot(jacobian_rrs,jacobian_kd,jacobian_bbp,rrs_hat,kd_hat,bbp_hat,perturbation_factors,X,\
-    #                        title='Sensitivity of the parameters near the AM solution',lims=[-1e-1,8])
 
     jacobian_rrs = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_rrs_initialparam_lognormalresults.npy')) #drrs/depsiloni
     jacobian_kd = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_kd_initialparam_lognormalresults.npy'))
@@ -576,8 +565,7 @@ if __name__ == '__main__':
         mcmc_runs[i] = np.load(MODEL_HOME + '/experiments/mcmc/run_' + str(i)+'.npy')
 
     #mcmc_runs = mcmc_runs[:,2000:,:]
-    mcmc_runs_mean, mcmc_runs_std = np.empty((14)),np.empty((14))
-
+    perturbation_factors_mcmc = np.reshape(mcmc_runs[:,2000::280,:],(mcmc_runs[:,2000::280,:].shape[0]*mcmc_runs[:,2000::280,:].shape[1],14)).mean(axis=0)
 
     #correlation_matrix(num_runs,mcmc_runs,plot=False,table=False)
 
@@ -644,8 +632,10 @@ if __name__ == '__main__':
     plt.close()
     mcmc_runs = mcmc_runs[:,2000:,:]
 
+    print(mcmc_runs.shape)
 
-    parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=False,table=True,constant_values=constant_values,perturbation_factors = perturbation_factors,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels)
+
+    parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=True,constant_values=constant_values,perturbation_factors = perturbation_factors_mcmc,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels)
     
     plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')
             

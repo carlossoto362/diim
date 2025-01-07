@@ -7,16 +7,22 @@ import torch
 from torch.utils.data import DataLoader,random_split
 from torch import nn
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import scipy
+import matplotlib.pyplot as plt
+import scipy
+from datetime import datetime
+import warnings
+warnings.filterwarnings(action="ignore")
+
 from diimpy import read_data_module as rdm
 from diimpy import Forward_module as fm
 from diimpy import bayesian_inversion as bayes
-import matplotlib.pyplot as plt
-import scipy
 from diimpy import sensitivity_analysis_and_mcmc_runs as mcmc
 from diimpy import plot_data_lognormal as pdl
-from datetime import datetime
 from diimpy import CVAE_model_part_one as cvae_one
 from diimpy import CVAE_model_part_two as cvae_two
+
 
 if 'DIIM_PATH' in os.environ:
     HOME_PATH = MODEL_HOME = os.environ["DIIM_PATH"]
@@ -54,7 +60,7 @@ def argument():
 
 def iprint(message,delay = 0.02):
     """Prints a message letter by letter, with a given delay between letters."""
-    print("Interactive cat: - ",end='')
+    print(" - ",end='')
     
     for letter in message:
         sys.stdout.write(letter)  # Print letter without newline
@@ -72,7 +78,7 @@ def cprint(message,output=None):
 def iflag(flag=None):
     limit_tr = 0
     while limit_tr < 3:
-        flag = input('User - ')
+        flag = input('')
         flag = ("".join(flag.strip())).lower()
         if flag in ['yes','no']:
             return flag
@@ -97,7 +103,8 @@ def bayesian_part():
     print('')
 
     iprint('To recreate the paper, we first run alternate minimization with an approximately uniform prior (alpha >> 1).')
-    iprint('Would you like to run this part? (yes/no)')
+    iprint('''Would you like to run this part? (yes/no)
+    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
     flag=iflag()
     if flag == 'yes':
         iprint('This part saves the history of perturbation_factors_used in DIIM_PATH + "/settings/reproduce/perturbation_factors/perturbation_factors_history_new.pt"')
@@ -108,7 +115,8 @@ def bayesian_part():
 
             
     iprint('With these perturbation factors, we tuned the prior parameter alpha (see the paper, Appendix B). This step is necessary because, for each day, the inversion is performed using only five wavelengths. With such limited data, the prior significantly influences the uncertainty. Our approach to tuning alpha is similar to Bayesian model specification, where, assuming Gaussianity, the best model balances fitting the data and minimizing individual uncertainties.')
-    iprint('Would you like to run this part? (yes/no)')
+    iprint('''Would you like to run this part? (yes/no)
+    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
     flag=iflag()
     if flag == 'yes':
         iprint('This step saves the output of the Bayesian minimization with the different α values in DIIM_PATH + "/settings/reproduce/alphas". For this step, we used the perturbation factors from the previous step, specifically the ones saved in DIIM_PATH + "/settings/perturbation_factors/perturbation_factors_history_AM_test.npy".')
@@ -119,7 +127,8 @@ def bayesian_part():
 
             
     iprint('Finally, we run the inversion using the best alpha and the optimal perturbation factors to obtain the historical optical constituents along with their uncertainties.')
-    iprint('Would you like to run this part? (yes/no)')
+    iprint('''Would you like to run this part? (yes/no)
+    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
     results_AM_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam' 
     flag=iflag()
     if flag == 'yes':
@@ -266,17 +275,24 @@ This function calculates the Jacobians at the specified perturbation_factors. ""
                              title='Sensitivity of the parameters with the literature values')
 
     iprint('Next, we run an MCMC algorithm with initial conditions close to the output of the alternate minimization (AM). We expect this output to be close to the mode of the distribution, which would result in a small tail to cut from the MCMC chain.')
-    iprint('Would you like to run this part? (yes/no)')
+    iprint('''Would you like to run this part? (yes/no)
+    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
+
+    num_runs = 40
+    output_path = MODEL_HOME + '/experiments/mcmc/'
+    
     flag=iflag()
     if flag == 'yes':
-        
-        cprint('>>>mcmc()')
+        num_runs = 20
+        output_path = MODEL_HOME + '/settings/reproduce/mcmc/'
+        cprint('>>>output_path = MODEL_HOME + "/settings/reproduce/mcmc/"')
+        cprint('>>>mcmc.mcmc(output_path = output_path)')
         print('')
-        iprint("We will create 20 mcmc runs, and store them in DIIM_PATH + '/experiments/mcmc/runs2/run_' + str(j)+'.npy', with j from 0 to 19. As espected, will take some time...")
-        mcmc.mcmc()
+        iprint("We will create 20 mcmc runs, and store them in DIIM_PATH + 'settings/reproduce/mcmc/run_' + str(j)+'.npy', with j from 0 to 19. As espected, will take some time...")
+        mcmc.mcmc(output_path = output_path)
     iprint(""" Now we can read our MCMC runs (I did 40 runs), compute autocorrelations to discard self-correlated elements, or plot the final parameters obtained by averaging the final perturbation factors after discarding the tail and the self-correlated elements. Here, we will only plot, but the rest of the code can be found in the sensitivity_analysis_and_mcmc_runs.py script.
 
-Important: We stored the perturbation factors as perturbation_factors_mcmc_mean/std, containing only the uncorrelated values, excluding the tail. However, to plot the next figure, we will plot everything, as we want to show the entire MCMC chain.""")
+Important: We stored the perturbation factors as perturbation_factors_mcmc_mean/std, using only uncorrelated values, excluding the tail. However, to plot the next figure, we will plot everything, as we want to show the entire MCMC chain.""")
     
     indexes = rdm.customTensorData(data_path=data_dir,which='all',per_day = True,randomice=True,one_dimensional = False,seed = 1853,device=my_device).train_indexes
     perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
@@ -285,15 +301,13 @@ Important: We stored the perturbation factors as perturbation_factors_mcmc_mean/
     chla_hat = torch.tensor(np.load( MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/X_hat.npy')[:,[0,2,4]]).to(torch.float32).unsqueeze(1)[indexes]
     constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
 
-    num_runs = 40
     mcmc_runs = np.empty((num_runs,3000,14))
 
 
     for i in range(num_runs):
-        mcmc_runs[i] = np.load(MODEL_HOME + '/experiments/mcmc/run_' + str(i)+'.npy')
+        mcmc_runs[i] = np.load(output_path + '/run_' + str(i)+'.npy')
 
-    #mcmc_runs = mcmc_runs[:,2000:,:]
-    mcmc_runs_mean, mcmc_runs_std = np.empty((14)),np.empty((14))
+    perturbation_factors_mcmc = np.reshape(mcmc_runs[:,2000::280,:],(mcmc_runs[:,2000::280,:].shape[0]*mcmc_runs[:,2000::280,:].shape[1],14)).mean(axis=0)
 
     mcmc_runs = mcmc_runs[:,:,5:] * constant_values
 
@@ -364,7 +378,7 @@ Important: We stored the perturbation factors as perturbation_factors_mcmc_mean/
     cprint("constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])")
     cprint('mcmc.parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False)')
     constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
-    mcmc.parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False,constant_values=constant_values,perturbation_factors = perturbation_factors,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels)
+    mcmc.parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False,constant_values=constant_values,perturbation_factors = perturbation_factors_mcmc,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels)
 
 def NN_part():
     iprint(''' A different approach is to use the SGVB framework (see the paper, section 4.5). It consists of training a probabilistic neural network with a latent variable structure. The final architecture and parameters for the neural network were tuned using Ray Tune. As described in the README file, this framework consists of three parts.
@@ -475,7 +489,8 @@ The state dictionary of the neural network after training is saved in DIIM_PATH 
 
     iprint('To tune the parameters, the function used was >>>cvae_two.explore_hyperparameters(). Once Ray Tune explores the possible parameters, the function >>>save_cvae_first_part() loads them and trains the neural network with all the training data (to tune the parameters, the neural network was trained with 90% of the training data). The trained state dictionary is then stored in DIIM_PATH + "/settings/VAE_model/model_second_part_chla_centered.pt. The names are the same for training the first part and the second part of the neural network. Finally, the output can be stored.')
     iprint('Finally, you can save the results to use them in the future.')
-    iprint('Would you like to run this part? (yes/no)')
+    iprint('''Would you like to run this part? (yes/no)
+    no is advaisable if you only want to know how the results where made, yes is if you want to reproduce locally the results.''')
     flag=iflag()
     if flag == 'yes':
 

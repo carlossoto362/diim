@@ -64,6 +64,29 @@ For completeness, I list here the libraries required for all the scripts to work
     tensorboardX
 
 #############################################################################################
+################################# HOW TO TEST AND REPRODUCE #################################
+#############################################################################################
+
+A simple test script called test.py has been added to check if everything is working correctly
+ and also serves as a guide for how the code works (read the comments in the script).
+
+For a longer and detailed description on how to reproduce the results in the paper, run the 
+script reproduce.py, by runing:
+
+       >>>python3 reproduce.py [-h|-a|-b|-m|-n]
+
+Use -h for help, -a for all, -b for only the bayes part, -m for only the mcmc part and -n for 
+only the neural network part.
+
+For symple reproducing testing, I sugest to run:
+
+    >>>python3 -W ignore reproduce.py -b
+
+It will take approximately 30 minutes to run. The mcmc part could take several hours. For a
+fast computation, you can always type "no" to use pre-computed data. 
+
+
+#############################################################################################
 ##################################### DATA AVAILABILITY #####################################
 #############################################################################################
 All the data used in our work is contained in settings/npy_data. For easy accessibility,
@@ -161,17 +184,3 @@ The folder settings contains all the necessary files to run the codes in diimpy:
     lambda-independent parameters are in cte.csv.
 
 
-#############################################################################################
-################################# HOW TO TEST AND REPRODUCE #################################
-#############################################################################################
-
-A simple test script called test.py has been added to check if everything is working correctly
- and also serves as a guide for how the code works (read the comments in the script).
-
-For a longer and detailed description on how to reproduce the results in the paper, run the 
-script reproduce.py, by runing:
-
->>>python3 reproduce.py [-h|-a|-b|-m|-n]
-
-Use -h for help, -a for all, -b for only the bayes part, -m for only the mcmc part and -n for 
-only the neural network part.

@@ -14,8 +14,8 @@ DOI: https://doi.org/10.5194/gmd-2024-174.
 #############################################################################################
 
 The scripts for this work were written in Python 3 and tested in Python >= 3.8.
-For automatic installation, a Darwin or Linux prompt is required, as well as pip to install
-the requirements. All the libraries required are listed in the file requirements.txt.
+For automatic installation, a Darwin or Linux prompt with pip installed is required.
+ All the libraries required are listed in the next section.
 
 #############################################################################################
 ##################################### HOW TO INSTALL DIIM ###################################

@@ -483,7 +483,7 @@ def mcmc():
                            dim_hiden_layers_mean = dim_hiden_layers_mean,alpha_mean=alpha_mean,dim_last_hiden_layer_mean = dim_last_hiden_layer_mean,\
                            number_hiden_layers_cov = number_hiden_layers_cov,\
                            dim_hiden_layers_cov = dim_hiden_layers_cov,alpha_cov=alpha_cov,dim_last_hiden_layer_cov = dim_last_hiden_layer_cov,x_mul=x_mul,x_add=x_add,\
-                           y_mul=y_mul,y_add=y_add,constant = constant,model_dir = MODEL_HOME + '/VAE_model').to(my_device)
+                           y_mul=y_mul,y_add=y_add,constant = constant,model_dir = MODEL_HOME + '/settings/VAE_model').to(my_device)
 
     
     model_NN.load_state_dict(torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))

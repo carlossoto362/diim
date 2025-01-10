@@ -4,8 +4,8 @@ matplotlib>=3.7
 matplotlib-inline>=0.1.7
 mdurl>=0.1.2
 multiprocess>=0.70.16
-networkx>=2.8.8
 numpy>=1.24
+networkx>=2.8.8
 pandas>=2
 ray>=2.1
 scipy>=1.1
@@ -15,3 +15,4 @@ pvlib>=0.11.0
 tqdm>=4.66.5
 pyarrow
 tensorboardX
+netCDF4

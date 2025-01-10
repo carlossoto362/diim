@@ -14,6 +14,10 @@ PYTHON_VERSION ?= python3
 PYTHON := $(shell command -v $(PYTHON_VERSION) || echo "not_found")
 PYTHON_VERSION_ := $(shell $(PYTHON) -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
 
+
+OASIM_VERSION ?= release
+OASIM_COMPILER ?= gcc
+
 create_venv:
 	@echo $(SHRC_MESSAGE)
 
@@ -45,12 +49,16 @@ add_bashrc_line:
 
 setup: requirements.txt
 	echo $(ENVDIR)
-	$(ENVDIR)/diim_env/bin/pip install networkx>=2.8.8
 	$(ENVDIR)/diim_env/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 	$(ENVDIR)/diim_env/bin/pip install -r requirements.txt
 	cp -r ./diimpy $(ENVDIR)/diim_env/lib/$(PYTHON_VERSION_)/site-packages/
+	cp -r ./extern/bit.sea/src/bitsea $(ENVDIR)/diim_env/lib/$(PYTHON_VERSION_)/site-packages/
 	@echo run 'source $(ENVDIR)/diim_env/bin/activate' for activating diim env, 'deactivate' for deactivating it. 
 	@echo also run 'source $(SHRC)' to let know to the scripts where is the home directory of DIIM. 
+	make oasim_make
+
+oasim_make:
+	cd extern/OASIM_ATM/ && build_$(OASIM_VERSION)_$(OASIM_COMPILER).sh
 
 clean:
 	@rm -f -r $(DIIM_ENV_PATH)/diim_env

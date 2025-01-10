@@ -1,0 +1,6 @@
+[submodule "extern/OASIM_ATM"]
+	path = extern/OASIM_ATM
+	url = https://github.com/BIOPTIMOD/OASIM_ATM.git
+[submodule "extern/bit.sea"]
+	path = extern/bit.sea
+	url = https://github.com/inogs/bit.sea.git

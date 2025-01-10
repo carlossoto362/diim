@@ -1,0 +1,13 @@
+input:
+  atmospheric_data_file: ../extern/OASIM_ATM/test/data/atmo.txt
+  absorption_data_file: ../extern/OASIM_ATM/test/data/abso.txt
+  cloud_slingo_file: ../extern/OASIM_ATM/test/data/slingo.txt
+compute:
+  integration_step_secs: 300.0
+  max_integration_steps: 1000
+  zenith_avg: true
+  local_time: false
+  am: 1.0
+  vi: 25.0
+output:
+  bin_file: ../extern/OASIM_ATM/test/data/bin.txt

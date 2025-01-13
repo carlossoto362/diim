@@ -234,13 +234,13 @@ def arguments():
                         type = str,
                         required = False,
                         help = '''file with liboasim-py.so''',
-                        default = HOME_PATH + '/extern/OASIM_ATM/OASIMlib/liboasim-py.so'
+                        default = HOME_PATH + '/map/liboasim-py.so'
                         )
     parser.add_argument('--oasim_config_file', '-iyaml',
                         type = str,
                         required = False,
                         help = '''file with the oasim config.yaml''',
-                        default = HOME_PATH + '/extern/csotolop/OASIM_ATM/test/config.yaml'
+                        default = HOME_PATH + '/map/oasim_config.yaml'
                         )    
     parser.add_argument('--reflectance_datadir', '-irrs',
                         type = str,

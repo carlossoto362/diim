@@ -15,19 +15,20 @@ import pvlib
 from datetime import datetime, timedelta
 from pandas import DatetimeIndex
 from tqdm import tqdm
-from multiprocessing.pool import Pool
-import PySurfaceData.bayesian_inversion as bayes
-import PySurfaceData.Forward_module as fm
-import PySurfaceData.read_data_module as rdm
+#from multiprocessing.pool import Pool
+import diimpy.bayesian_inversion as bayes
+import diimpy.Forward_module as fm
+import diimpy.read_data_module as rdm
 import pandas as pd
 from mpi4py import MPI
 import itertools
 
-if 'OGS_ONE_D_HOME_PATH' in os.environ:
-    HOME_PATH = MODEL_HOME = os.environ["OGS_ONE_D_HOME_PATH"]
+
+if 'DIIM_PATH' in os.environ:
+    HOME_PATH = MODEL_HOME = os.environ["DIIM_PATH"]
 else:
 
-    print("Missing local variable OGS_ONE_D_HOME_PATH. \nPlease add it with '$:export OGS_ONE_D_HOME_PATH=path/to/ogs/one/d/model'.")
+    print("Missing local variable DIIM_PATH. \nPlease add it with '$:export DIIM_PATH=path/to/diim'.")
     sys.exit()
 
 def plot_map(ncfile=None,name_variable='sst',time_i=0,dim2 = 0,map_flag=False,map_=None):
@@ -48,94 +49,57 @@ def plot_map(ncfile=None,name_variable='sst',time_i=0,dim2 = 0,map_flag=False,ma
     
     plt.savefig('fig.pdf')
     
-def cubic_splines_coefficients(xs,maps_):
-    len_lat_ = maps_.shape[-2]
-    len_lon_ = maps_.shape[-1]
-    n_data_points = maps_.shape[0]
-    a_sp = maps_
-    b_sp = torch.empty((n_data_points-1,len_lat_,len_lon_))
-    d_sp = torch.empty((n_data_points-1,len_lat_,len_lon_))
 
-    h_sp = (   (torch.ones((len_lat_*len_lon_,n_data_points - 1))* xs[1:] - torch.ones((len_lat_*len_lon_,n_data_points - 1))* xs[:-1]).T   ).reshape(n_data_points - 1,len_lat_,len_lon_)
-    alpha_sp = torch.zeros((n_data_points - 1,len_lat_,len_lon_))
-    alpha_sp[1:] = ( 3*(a_sp[2:] - a_sp[1:-1])/h_sp[1:] ) - ( 3*(a_sp[1:-1] - a_sp[:-2])/h_sp[:-1] )
-    
-    c_sp = torch.zeros((n_data_points,len_lat_,len_lon_))
-    l_sp = torch.ones((n_data_points,len_lat_,len_lon_))
-    mu_sp = torch.zeros((n_data_points,len_lat_,len_lon_))
-    z_sp = torch.zeros((n_data_points,len_lat_,len_lon_))
-
-    for i in range(1,n_data_points - 1):
-        l_sp[i] = 2*(xs[i+1] - xs[i-1]) - h_sp[i-1]*mu_sp[i-1]
-        mu_sp[i] = h_sp[i]/l_sp[i]
-        z_sp[i] = (alpha_sp[i] - h_sp[i-1]*z_sp[i-1])/l_sp[i]
-    for j in np.flip(np.arange(n_data_points-1)):
-        c_sp[j] = z_sp[j] - mu_sp[j]*c_sp[j+1]
-        b_sp[j] = (a_sp[j+1] - a_sp[j])/h_sp[j] - h_sp[j]*(c_sp[j+1] + 2*c_sp[j])/3
-        d_sp[j] = (1/3)*(c_sp[j+1] - c_sp[j])/h_sp[j]
-    return a_sp[:-1],b_sp,c_sp[:-1],d_sp
-
-def cubic_splines(x,xs,a_sp,b_sp,c_sp,d_sp):
-    position = 0
-    for i in range(1,len(xs)-1):
-        if (x<xs[i]) and (x>xs[i-1]):
-            position = i-1
-            
-    return a_sp[position] + b_sp[position]*(x-xs[position]) + c_sp[position]*(x-xs[position])**2 + d_sp[position]*(x - xs[position])**3
-
+%njit
 def linear_splines(x,xs,map_):
     
     position = 0
     for i in range(1,len(xs)-1):
         if (x<=xs[i]) and (x>xs[i-1]):
             return map_[i-1] + (map_[i] - map_[i-1])*(x - xs[i-1])/(xs[i] - xs[i-1])
-        
 
-def get_solarposition_(iterable):
-    return get_solarposition(*iterable)['zenith'].iloc[0]
-
-def zenith_angle(time,lats,lons,folder = '.'):
-
-    if os.path.exists(folder + '/zenith_'+time.strftime('%Y%m%d_%H:%M%S.pt')):
-        zenith_ = torch.load(folder + '/zenith_'+time.strftime('%Y%m%d_%H:%M%S.pt'))
-        return zenith_
+%njit        
+def get_solarposition_(time_utc,lats,lons):
+    year = time_utc.year
+    time_elapsed = time_utc  - datetime(year = year,month=1,day=1)
+    hour_ = time_utc.time()
     
-    zenith_ = torch.empty((len(lats),len(lons)))
-    for i in tqdm(range(len(lats))):
-        with Pool() as pool:
-            zenith_[i] = torch.tensor(list(pool.map(get_solarposition_,zip(   [DatetimeIndex([time])]*len(lons),\
-                                                               [lats[i]]*len(lons),\
-                                                               lons    ))))
+    days_N = time_elapsed.days + time_elapsed.seconds/86400 #86400 = 60*60*24
+    hour_angle =  (hour_.hour + hour_.minute/60 + hour_.second/3600  + (lons*12/180) - 12)*np.pi/12 #local time, (lons*12/180) is degrees to hours
+    sun_declination = - np.arcsin(
+         0.39779 * np.cos(  (0.98565*(days_N + 10) + 1.914*np.sin(  0.98565*(days_N - 2)*np.pi/180  ))*np.pi/180 ) #
+    )
+    zenith_angle = np.arccos(
+        np.sin(lats*np.pi/180)*np.sin(sun_declination) + np.cos(lats*np.pi/180)*np.cos(sun_declination)*np.cos(hour_angle)
+    )
+    return zenith_angle
 
-    torch.save(zenith_,folder + '/zenith_'+time.strftime('%Y%m%d_%H:%M%S.pt'))
+%njit
+def zenith_angle(time_utc,lats,lons,folder = '.'):
+    np.save(folder + '/zenith_'+time.strftime('%Y%m%d_%H:%M%S.npy'),get_solar_position_(time_utc,lats,lons))
     return zenith_
 
+%njit
 def PAR_calculator(wl,Edir,Edif,time,folder = '.'):
 
-    if os.path.exists(folder + '/PAR_'+time.strftime('%Y%m%d.pt')):
-        PAR_ = torch.load(folder + '/PAR_'+time.strftime('%Y%m%d.pt'))
+    if os.path.exists(folder + '/PAR_'+time.strftime('%Y%m%d.npy')):
+        PAR_ = np.load(folder + '/PAR_'+time.strftime('%Y%m%d.npy'))
         return PAR_
 
     Na = 6.0221408e+23
     h = 6.62607015e-34
     c = 299792458 
     constant = (10**6)/ (Na*h*c)
-    #lambdas = np.linspace(400,700,100)
-    #f_lambda = torch.empty((100,*Edir.shape[1:]))
-    #for i,lambda_ in enumerate(lambdas):
-    #    f_lambda[i] = (linear_splines(lambda_,wl,Edif) + linear_splines(lambda_,wl,Edir))*lambda_
-
-    PAR_ = torch.zeros((Edir.shape[1:]))
+    PAR_ = np.zeros((Edir.shape[1:]))
     irange = ((wl>401) & (wl<699))
     ilen = len(wl[irange])
 
     for i in range(ilen):
-    #    PAR_ += ((f_lambda[i+1] + f_lambda[i])/2)
         PAR_ += (Edif[irange][i] + Edir[irange][i])*wl[irange][i]*1e-9 # Edif are the bin irradiance, the integral Edif for a rectangle of size dlambda
 
     PAR_ = PAR_  * constant
 
-    torch.save(PAR_,folder + '/PAR_'+time.strftime('%Y%m%d.pt'))
+    np.save(folder + '/PAR_'+time.strftime('%Y%m%d.npy'),PAR_)
     return PAR_
 
 class read_map_class():

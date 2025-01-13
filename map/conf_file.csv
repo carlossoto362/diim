@@ -10,7 +10,7 @@ end_date 20190102-16:00:00
 mask_file /g100_work/OGS_devC/V9C/RUNS_SETUP/PREPROC/MASK/meshmask.nc
 location map
 wavelengths_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data/bin.txt
-oasimlib_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/OASIMlib/liboasim-py.so
+oasimlib_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/liboasim-py.so
 oasim_config_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_config.yaml
 output_prefix oasim_med
 output_datadir /g100_work/OGS23_PRACE_IT/csoto/DIIM/map

@@ -16,3 +16,4 @@ tqdm>=4.66.5
 pyarrow
 tensorboardX
 netCDF4
+mpi4py

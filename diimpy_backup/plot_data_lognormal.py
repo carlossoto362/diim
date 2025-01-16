@@ -617,7 +617,7 @@ def plot_constants_1(perturbation_path = MODEL_HOME + '/settings/perturbation_fa
     perturbation_factors_history_NN = torch.tensor(np.load(perturbation_path + '/' +  vae_name)).to(torch.float32)
     
     perturbation_factors_history_lognormal = torch.tensor(np.load(perturbation_path + '/perturbation_factors_history_AM_test.npy')).to(torch.float32)
-    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',dict=True)
+    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv')
 
     constants_history_NN = perturbation_factors_history_NN[:-1,5:]* np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
     print('.....',len(constants_history_NN))
@@ -664,7 +664,7 @@ def plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_fa
     
     perturbation_factors_history_NN = torch.tensor(np.load(perturbation_path + '/'+vae_name)).to(torch.float32)[:400]
     perturbation_factors_history_lognormal = torch.tensor(np.load(perturbation_path + '/perturbation_factors_history_AM_test.npy')).to(torch.float32)[:400]
-    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',dict=True)
+    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv')
 
     labs = ['(a)','(b)','(c)']
 

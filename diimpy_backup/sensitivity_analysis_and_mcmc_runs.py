@@ -247,7 +247,7 @@ def plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_fa
     perturbation_factors_history_lognormal =np.load(perturbation_path + '/perturbation_factors_history_AM_final.npy')[-1]
     perturbation_factors_mean = np.load(perturbation_path + '/perturbation_factors_mean_mcmc.npy')
     perturbation_factors_std = np.load(perturbation_path + '/perturbation_factors_std_mcmc.npy')
-    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',dict=True)
+    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv')
 
     labs = ['(a)','(b)','(c)']
 
@@ -552,7 +552,7 @@ if __name__ == '__main__':
     perturbation_factors_NN_std = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(torch.float32).std(axis=0)
     chla_hat = torch.tensor(np.load( MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/X_hat.npy')[:,[0,2,4]]).to(torch.float32).unsqueeze(1)[indexes]
 
-    constant = read_constants(file1=data_dir + '/../cte_lambda.csv',file2=data_dir+'/../cte.csv',my_device = my_device,dict=True)
+
     constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
 
 

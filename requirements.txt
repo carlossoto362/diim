@@ -17,3 +17,4 @@ pyarrow
 tensorboardX
 netCDF4
 mpi4py
+numba

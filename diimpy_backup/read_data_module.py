@@ -7,8 +7,6 @@ import pandas as pd
 from scipy import stats
 import os
 import sys
-from typing import NamedTuple
-from diimpy.Forward_module import AbsorptionParams
 
 if 'DIIM_PATH' in os.environ:
     HOME_PATH = MODEL_HOME = os.environ["DIIM_PATH"]
@@ -252,36 +250,9 @@ class customTensorData():
         return image.to(self.precision).to(self.device), label.to(self.precision).to(self.device)
 
 
-def fill_params(constant):
-    params = AbsorptionParams(dCDOM = constant['dCDOM'],
-                              sCDOM = constant['sCDOM'],
-                              dNAP = constant['dNAP'],
-                              sNAP = constant['sNAP'],
-                              absortion_w = constant['absortion_w'],
-                              absortion_PH = constant['absortion_PH'],
-                              eNAP = constant['eNAP'],
-                              fNAP = constant['fNAP'],
-                              linear_regression_slope_b = constant['linear_regression_slope_b'],
-                              linear_regression_slope_s = constant['linear_regression_slope_s'],
-                              linear_regression_intercept_b = constant['linear_regression_intercept_b'],
-                              linear_regression_intercept_s = constant['linear_regression_intercept_s'],
-                              Theta_o = constant['Theta_o'],
-                              Theta_min = constant['Theta_min'],
-                              beta = constant['beta'],
-                              sigma = constant['sigma'],
-                              backscattering_w = constant['backscattering_w'],
-                              scattering_w = constant['scattering_w'],
-                              vs = constant['vs'],
-                              rs = constant['rs'],
-                              vu = constant['vu'],
-                              ru = constant['ru'],
-                              rd = constant['rd'],
-                              T = constant['T'],
-                              gammaQ = constant['gammaQ'],
-                              )
-    return params
 
-def read_constants(file1=HOME_PATH+'/settings/cte_lambda.csv',file2=HOME_PATH+'/settings/cte.csv',tensor = True,my_device = 'cpu',dict=False):
+
+def read_constants(file1=HOME_PATH+'/settings/cte_lambda.csv',file2=HOME_PATH+'/settings/cte.csv',tensor = True,my_device = 'cpu'):
     """
     function that reads the constants stored in file1 and file2. 
     file1 has the constants that are dependent on lambda, is a csv with the columns
@@ -322,11 +293,8 @@ def read_constants(file1=HOME_PATH+'/settings/cte_lambda.csv',file2=HOME_PATH+'/
     linear_regression_intercept = linear_regression.intercept
     constant['linear_regression_slope_b'] = linear_regression_slope
     constant['linear_regression_intercept_b'] = linear_regression_intercept
-    if dict:
-        return constant
-    else:
-        constant = fill_params(constant)
-        return constant
+    
+    return constant
 
 
 def transform_to_data_dataframe(data_path,which='all'):

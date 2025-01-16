@@ -58,7 +58,9 @@ setup: requirements.txt
 	make oasim_make
 
 oasim_make:
-	cd extern/OASIM_ATM/ && build_$(OASIM_VERSION)_$(OASIM_COMPILER).sh
+	git submodule init
+	git submodule update
+	cd extern/OASIM_ATM/ && ./build_$(OASIM_VERSION)_$(OASIM_COMPILER).sh
 
 clean:
 	@rm -f -r $(DIIM_ENV_PATH)/diim_env

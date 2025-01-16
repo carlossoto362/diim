@@ -1,0 +1,16 @@
+dateformat %Y%m%d-%H:%M:%S
+atmosphere_datadir /g100_work/OGS_devC/NECCTON/OPTICS/2019/01
+aerosol_datadir /g100_work/OGS_devC/NECCTON/OPTICS
+cloud_datadir /g100_work/OGS_devC/NECCTON/OPTICS
+atmosphere_prefix atm
+aerosol_prefix aero
+cloud_prefix climatm
+start_date 20190102-07:00:00
+end_date 20190102-16:00:00
+mask_file /g100_work/OGS_devC/V9C/RUNS_SETUP/PREPROC/MASK/meshmask.nc
+location map
+wavelengths_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data/bin.txt
+oasimlib_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_map/liboasim-py.so
+oasim_config_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_map/oasim_config.yaml
+output_prefix oasim_med
+output_datadir /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_map/maps

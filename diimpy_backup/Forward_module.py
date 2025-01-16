@@ -5,9 +5,7 @@ import torch
 from torch import nn
 import os
 import sys
-from typing import Union
-
-
+from typing import NamedTuple
 
 if 'DIIM_PATH' in os.environ:
     HOME_PATH = MODEL_HOME = os.environ["DIIM_PATH"]
@@ -15,87 +13,62 @@ else:
     
     print("Missing local variable DIIM_PATH. \nPlease add it with '$:export DIIM_PATH=path/to/diimpy'.")
     sys.exit()
-        
-@torch.jit.script
-class AbsorptionParams:
-    def __init__(self, dCDOM: float,
-                 sCDOM: float,
-                 dNAP: float,
-                 sNAP: float,
-                 absortion_w: torch.Tensor,
-                 absortion_PH: torch.Tensor,
-                 eNAP: float,
-                 fNAP: float,
-                 linear_regression_slope_b: float,
-                 linear_regression_intercept_b: float,
-                 Theta_o: float,
-                 Theta_min: float,
-                 beta: float,
-                 sigma: float,
-                 backscattering_w: torch.Tensor,
-                 linear_regression_slope_s: float,
-                 linear_regression_intercept_s: float,
-                 scattering_w: torch.Tensor,
-                 vs: float,
-                 rs: float,
-                 vu: float,
-                 ru: float,
-                 rd: float,
-                 T: float,
-                 gammaQ: float):
-        self.dCDOM=dCDOM
-        self.sCDOM = sCDOM
-        self.dNAP = dNAP
-        self.sNAP = sNAP
-        self.absortion_w = absortion_w
-        self.absortion_PH = absortion_PH
-        self.eNAP = eNAP
-        self.fNAP = fNAP
-        self.linear_regression_slope_b = linear_regression_slope_b
-        self.linear_regression_slope_s = linear_regression_slope_s
-        self.linear_regression_intercept_b = linear_regression_intercept_b
-        self.linear_regression_intercept_s = linear_regression_intercept_s
-        self.Theta_o = Theta_o
-        self.Theta_min = Theta_min
-        self.beta = beta
-        self.sigma = sigma
-        self.backscattering_w = backscattering_w
-        self.scattering_w = scattering_w
-        self.vs = vs
-        self.rs = rs
-        self.vu = vu
-        self.ru = ru
-        self.rd = rd
-        self.T = T
-        self.gammaQ = gammaQ
 
 
+class constant(NamedTuple):
+    dCDOM: float
+    sCDOM: float
+    dNAP: float
+    sNAP: float
+    absortion_w: float
+    absortion_PH: torch.Tensor
+    eNAP: float
+    fNAP: float
+    linear_regression_slope_b: float
+    linear_regression_intercept_b: float
+    Theta_o: float
+    Theta_min: float
+    beta: float
+    sigma: float
+    backscattering_w: torch.Tensor
+    linear_regression_slope_s: float
+    linear_regression_intercept_s: float
+    scattering_w: torch.Tensor
+    vs: float
+    rs: float
+    vu: float
+    ru: float
+    rd: float
+    cons_T: float
+    gammaQ: float
+    
 ###################################################################################################################################################################################################
 ############################################################################FUNCTIONS NEEDED TO DEFINE THE FORWARD MODEL###########################################################################
 ###################################################################################################################################################################################################
 
 ################Functions for the absortion coefitient####################
 @torch.jit.script
-def absortion_CDOM(lambda_,perturbation_factors,params: AbsorptionParams):
+def absortion_CDOM(lambda_,perturbation_factors,constant = None):
     """
     Function that returns the mass-specific absorption coefficient of CDOM, function dependent of the wavelength lambda. 
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return params.dCDOM*torch.exp(-(params.sCDOM * perturbation_factors[6])*(lambda_ - 450.))
+    print(constant)
+    return constant['dCDOM']*torch.exp(-(constant['sCDOM'] * perturbation_factors[6])*(lambda_ - 450.))
 
 @torch.jit.script
-def absortion_NAP(lambda_,params: AbsorptionParams):
+def absortion_NAP(lambda_,constant = None):
     """
     Mass specific absorption coefficient of NAP.
     See Gallegos et al., 2011.
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return params.dNAP*torch.exp(-params.sNAP*(lambda_ - 440.))
+    return constant['dNAP']*torch.exp(-constant['sNAP']*(lambda_ - 440.))
 
 @torch.jit.script
-def absortion(lambda_,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def absortion(lambda_,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     Total absortion coeffitient.
     aW,λ (values used from Pope and Fry, 1997), aP H,λ (values averaged and interpolated from
@@ -103,14 +76,17 @@ def absortion(lambda_,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParam
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return params.absortion_w + (params.absortion_PH* perturbation_factors[0])*chla + \
-                (absortion_CDOM(lambda_, perturbation_factors,params)* perturbation_factors[5])*CDOM + absortion_NAP(lambda_,params)*NAP
-   
+    if axis == None:
+        return constant['absortion_w'] + (constant['absortion_PH']* perturbation_factors[0])*chla + \
+                (absortion_CDOM(lambda_, perturbation_factors,constant = constant)* perturbation_factors[5])*CDOM + absortion_NAP(lambda_,constant = constant)*NAP
+    else:
+        return constant['absortion_w'][axis] + (constant['absortion_PH'][axis] * perturbation_factors[0])*chla + \
+                (absortion_CDOM(lambda_, perturbation_factors,constant = constant)* perturbation_factors[5])*CDOM + absortion_NAP(lambda_,constant = constant)*NAP
     
 ##############Functions for the scattering coefitient########################
 
 @torch.jit.script
-def Carbon(chla,PAR, perturbation_factors,params: AbsorptionParams):
+def Carbon(chla,PAR, perturbation_factors,constant = None):
     """
     defined from the carbon to Chl-a ratio. 
     theta_o, sigma, beta, and theta_min constants (equation and values computed from Cloern et al., 1995), and PAR
@@ -119,15 +95,15 @@ def Carbon(chla,PAR, perturbation_factors,params: AbsorptionParams):
     of some of the constants of the bio quimical model. 
     """
     nominator = chla
-    beta =  params.beta * perturbation_factors[11]
-    sigma = params.sigma * perturbation_factors[12]
+    beta =  constant['beta'] * perturbation_factors[11]
+    sigma = constant['sigma'] * perturbation_factors[12]
     exponent = -(PAR - beta)/sigma
-    denominator = (params.Theta_o* perturbation_factors[10]) * ( torch.exp(exponent)/(1+torch.exp(exponent)) ) + \
-        (params.Theta_min * perturbation_factors[9])
+    denominator = (constant['Theta_o']* perturbation_factors[10]) * ( torch.exp(exponent)/(1+torch.exp(exponent)) ) + \
+        (constant['Theta_min'] * perturbation_factors[9])
     return nominator/denominator
 
 @torch.jit.script
-def scattering_ph(lambda_,perturbation_factors,params: AbsorptionParams):
+def scattering_ph(lambda_,perturbation_factors,constant = None):
     """
     The scattering_ph is defined initially as a linear regression between the diferent scattering_ph for each lambda, and then, I
     change the slope and the intercept gradually. 
@@ -135,11 +111,11 @@ def scattering_ph(lambda_,perturbation_factors,params: AbsorptionParams):
     of some of the constants of the bio quimical model. 
     """
     
-    return (params.linear_regression_slope_s * perturbation_factors[1]) *\
-        lambda_ + params.linear_regression_intercept_s * perturbation_factors[2]
+    return (constant['linear_regression_slope_s'] * perturbation_factors[1]) *\
+        lambda_ + constant['linear_regression_intercept_s'] * perturbation_factors[2]
 
 @torch.jit.script
-def backscattering_ph(lambda_,perturbation_factors,params: AbsorptionParams):
+def backscattering_ph(lambda_,perturbation_factors,constant = None):
     """
     The scattering_ph is defined initially as a linear regression between the diferent scattering_ph for each lambda, and then, I
     change the slope and the intercept gradually. 
@@ -147,21 +123,21 @@ def backscattering_ph(lambda_,perturbation_factors,params: AbsorptionParams):
     of some of the constants of the bio quimical model. 
     """
     
-    return (params.linear_regression_slope_b * perturbation_factors[3]) *\
-        lambda_ + params.linear_regression_intercept_b * perturbation_factors[4]
+    return (constant['linear_regression_slope_b'] * perturbation_factors[3]) *\
+        lambda_ + constant['linear_regression_intercept_b'] * perturbation_factors[4]
 
 @torch.jit.script
-def scattering_NAP(lambda_,params: AbsorptionParams):
+def scattering_NAP(lambda_,constant = None):
     """
     NAP mass-specific scattering coefficient.
     eNAP and fNAP constants (equation and values used from Gallegos et al., 2011)
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return params.eNAP*(550./lambda_)**params.fNAP
+    return constant['eNAP']*(550./lambda_)**constant['fNAP']
     
 @torch.jit.script
-def scattering(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
+def scattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=None,constant = None):
     """
     Total scattering coefficient.
     bW,λ (values interpolated from Smith and Baker, 1981,), bP H,λ (values used
@@ -169,23 +145,29 @@ def scattering(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionParam
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return params.scattering_w + scattering_ph(lambda_,perturbation_factors,params) * \
-            Carbon(chla,PAR,perturbation_factors,params) + scattering_NAP(lambda_,params) * NAP
-
+    if axis == None:
+        return constant['scattering_w'] + scattering_ph(lambda_,perturbation_factors,constant = constant) * Carbon(chla,PAR,perturbation_factors,constant = constant) + \
+                scattering_NAP(lambda_,constant = constant) * NAP
+    else:
+        return constant['scattering_w'][axis] + (scattering_ph(lambda_,perturbation_factors,constant = constant) * Carbon(chla,PAR,perturbation_factors,constant = constant))[axis] + \
+                scattering_NAP(lambda_,constant = constant)[axis] * NAP
     
 #################Functions for the backscattering coefitient#############
 
 @torch.jit.script
-def backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
+def backscattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=None,constant = None):
     """
     Total backscattering coefficient.
      Gallegos et al., 2011.
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return params.backscattering_w + backscattering_ph(lambda_,perturbation_factors,params) * \
-                Carbon(chla,PAR,perturbation_factors,params) + perturbation_factors[13]*0.005 * scattering_NAP(lambda_,params) * NAP
-
+    if axis == None:
+        return constant['backscattering_w'] + backscattering_ph(lambda_,perturbation_factors,constant = constant) * \
+                Carbon(chla,PAR,perturbation_factors,constant = constant) + perturbation_factors[13]*0.005 * scattering_NAP(lambda_,constant = constant) * NAP
+    else:
+        return constant['backscattering_w'][axis] + (backscattering_ph(lambda_,perturbation_factors,constant = constant) * \
+                Carbon(chla,PAR,perturbation_factors,constant = constant))[axis] + perturbation_factors[13]*0.005 * scattering_NAP(lambda_,constant = constant) * NAP
         
 
 
@@ -193,7 +175,7 @@ def backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionP
 #The final result is written in terms of these functions, see ...
 
 @torch.jit.script
-def c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams): 
+def c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,my_device = 'cpu',constant = None): 
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -202,11 +184,10 @@ def c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: Absorption
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return (absortion(lambda_,chla,NAP,CDOM,perturbation_factors,params)\
-            + scattering(lambda_,PAR,chla,NAP,perturbation_factors,params))/torch.cos(zenith*3.1416/180)
+    return (absortion(lambda_,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + scattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant))/torch.cos(zenith*3.1416/180)
 
 @torch.jit.script
-def F_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
+def F_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -215,12 +196,11 @@ def F_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params: AbsorptionParam
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return (scattering(lambda_,PAR,chla,NAP,perturbation_factors,params)\
-            - params.rd * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params))/\
+    return (scattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) - constant['rd'] * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant))/\
         torch.cos(zenith*3.1416/180.)
 
 @torch.jit.script
-def B_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
+def B_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -229,10 +209,10 @@ def B_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params: AbsorptionParam
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model.
     """
-    return  params.rd*backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params)/torch.cos(zenith*3.1416/180) 
+    return  constant['rd']*backscattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant)/torch.cos(zenith*3.1416/180) 
 
 @torch.jit.script
-def C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -241,11 +221,11 @@ def C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams)
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model.
     """
-    return (absortion(lambda_,chla,NAP,CDOM,perturbation_factors,params)\
-            + params.rs * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params) )/params.vs
+    return (absortion(lambda_,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + constant['rs'] * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) )/\
+        constant['vs']
 
 @torch.jit.script
-def B_u(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
+def B_u(lambda_,PAR,chla,NAP,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -254,10 +234,10 @@ def B_u(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return (params.ru * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params))/params.vu
+    return (constant['ru'] * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant))/constant['vu']
 
 @torch.jit.script
-def B_s(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
+def B_s(lambda_,PAR,chla,NAP,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -266,10 +246,10 @@ def B_s(lambda_,PAR,chla,NAP,perturbation_factors,params: AbsorptionParams):
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return (params.rs * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params))/params.vs
+    return (constant['rs'] * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant))/constant['vs']
 
 @torch.jit.script
-def C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -278,11 +258,11 @@ def C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams)
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return (absortion(lambda_,chla,NAP,CDOM,perturbation_factors,params)\
-            + params.ru * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,params))/ params.vu
+    return (absortion(lambda_,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + constant['ru'] * backscattering(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant))/\
+        constant['vu']
 
 @torch.jit.script
-def D(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def D(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -291,15 +271,12 @@ def D(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return (0.5) * (C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params) + \
-                     C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params) + \
-                    ((C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params) + \
-                      C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params))**2 - \
-                     4. * B_s(lambda_,PAR,chla,NAP,perturbation_factors,params) *  \
-                     B_u(lambda_,PAR,chla,NAP,perturbation_factors,params) )**(0.5))
+    return (0.5) * (C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + \
+                    ((C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant))**2 -\
+                     4. * B_s(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) * B_u(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) )**(0.5))
 
 @torch.jit.script
-def x(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def x(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -308,23 +285,17 @@ def x(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionPa
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model.
     """
-    denominator = (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) - \
-                   C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)) * \
-                   (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) + \
-                    C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)) + \
-                    B_s(lambda_,PAR,chla,NAP,perturbation_factors,params) * \
-                    B_u(lambda_,PAR,chla,NAP,perturbation_factors,params)
-    
-    nominator = -(C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params) + \
-                  c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params)) * \
-                  F_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params) - \
-                  B_u(lambda_,PAR,chla,NAP,perturbation_factors,params) * \
-                  B_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params)
+    denominator = (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) - C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)) * \
+        (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)) +\
+        B_s(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) * B_u(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant)
+    nominator = -(C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)) *\
+        F_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) -\
+        B_u(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) * B_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant)
 
     return nominator/denominator
 
 @torch.jit.script
-def y(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def y(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -333,23 +304,16 @@ def y(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionPa
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    denominator = (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) - \
-                   C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)) * \
-                   (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) + \
-                    C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)) + \
-                    B_s(lambda_,PAR,chla,NAP,perturbation_factors,params) * \
-                    B_u(lambda_,PAR,chla,NAP,perturbation_factors,params)
-    
-    nominator = (-B_s(lambda_,PAR,chla,NAP,perturbation_factors,params) * \
-                 F_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params) ) + \
-                 (-C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params) + \
-                  c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params)) * \
-                  B_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,params)
-    
+    denominator = (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) - C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)) * \
+        (c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)) +\
+        B_s(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) * B_u(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant)
+    nominator = (-B_s(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) * F_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant) ) +\
+        (-C_s(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) + c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)) *\
+        B_d(lambda_,zenith,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant)
     return nominator/denominator
 
 @torch.jit.script
-def C_plus(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def C_plus(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -358,10 +322,10 @@ def C_plus(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model.
     """
-    return E_dif_o - x(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) * E_dir_o
+    return E_dif_o - x(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) * E_dir_o
 
 @torch.jit.script
-def r_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def r_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -370,11 +334,10 @@ def r_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionPara
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return B_s(lambda_,PAR,chla,NAP,perturbation_factors,params) / \
-            D(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)
+    return B_s(lambda_,PAR,chla,NAP,perturbation_factors,axis=axis,constant = constant)/D(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)
 
 @torch.jit.script
-def k_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def k_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis = None,constant = None):
     """
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
     E_dir_o is the direct irradiance in the upper surface of the sea, 
@@ -383,11 +346,10 @@ def k_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionPara
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return D(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params) - \
-            C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)
+    return D(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) - C_u(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)
 
 @torch.jit.script
-def E_dir(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def E_dir(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     This is the analytical solution of the bio-chemical model. (https://doi.org/10.5194/gmd-2024-174)
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
@@ -397,10 +359,10 @@ def E_dir(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return E_dir_o*torch.exp(-z*c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params))
+    return E_dir_o*torch.exp(-z*c_d(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant))
 
 @torch.jit.script
-def E_u(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def E_u(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     This is the analytical solution of the bio-chemical model. (https://doi.org/10.5194/gmd-2024-174)
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
@@ -410,14 +372,12 @@ def E_u(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_fa
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return C_plus(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) *\
-            r_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)*\
-            torch.exp(- k_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)*z)+\
-            y(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) * \
-            E_dir(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params)
+    return C_plus(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) * r_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)*\
+                torch.exp(- k_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)*z)+\
+                y(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) * E_dir(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)
 
 @torch.jit.script
-def E_dif(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def E_dif(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis = None,constant = None):
     """
     This is the analytical solution of the bio-chemical model. (https://doi.org/10.5194/gmd-2024-174)
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
@@ -427,13 +387,12 @@ def E_dif(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_
     lambda is the wavelength, zenith is the zenith angle, PAR is the photosynthetic available radiation, chla the
     chloropyl-a, NAP the Non Algal Particles, and CDOM the Colored dissolved Organic Mater.
     """
-    return C_plus(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) * \
-        torch.exp(- k_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,params)*z) + \
-        x(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) * \
-        E_dir(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params)
+    return C_plus(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) *\
+                torch.exp(- k_plus(lambda_,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)*z)+\
+                x(lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) * E_dir(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)
         
 @torch.jit.script
-def bbp(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def bbp(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     Particulate backscattering at depht z
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
@@ -443,11 +402,15 @@ def bbp(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,pa
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return backscattering_ph(lambda_,perturbation_factors,params) * \
-                Carbon(chla,PAR,perturbation_factors,params) + perturbation_factors[13]*0.005 * scattering_NAP(lambda_,params) * NAP
-    
+    if axis == None:
+        return backscattering_ph(lambda_,perturbation_factors,constant = constant) * \
+                Carbon(chla,PAR,perturbation_factors,constant = constant) + perturbation_factors[13]*0.005 * scattering_NAP(lambda_,constant = constant) * NAP
+    else:
+        return (backscattering_ph(lambda_,perturbation_factors,constant = constant) * \
+                Carbon(chla,PAR,perturbation_factors,constant = constant))[axis] + perturbation_factors[13]*0.005 * scattering_NAP(lambda_,constant = constant) * NAP
+
 @torch.jit.script
-def kd(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def kd(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=None,constant = None):
     """
     Atenuation Factor
     E_dif_o is the diffracted irradiance in the upper surface of the sea, 
@@ -457,17 +420,15 @@ def kd(z:float,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_fac
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model.
     """
-    return (z**-1)*torch.log((E_dir_o + E_dif_o)/ \
-                             (E_dir(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params) +\
-                              E_dif(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params)))
-                                                  
+    return (z**-1)*torch.log((E_dir_o + E_dif_o)/(E_dir(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant) +\
+                                                  E_dif(z,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis=axis,constant = constant)))
 
 ##########################from the bio-optical model to RRS(Remote Sensing Reflectance)##############################
 #defining Rrs
 #Q=5.33*np.exp(-0.45*np.sin(np.pi/180.*(90.0-Zenith)))
 
 @torch.jit.script
-def Q_rs(zenith,perturbation_factors):
+def Q_rs(zenith,perturbation_factors,constant = None):
     """
     Empirical result for the Radiance distribution function, 
     equation from Aas and Højerslev, 1999, 
@@ -477,36 +438,35 @@ def Q_rs(zenith,perturbation_factors):
     return (5.33 * perturbation_factors[7])*torch.exp(-(0.45 * perturbation_factors[8])*torch.sin((3.1416/180.0)*(90.0-zenith)))
 
 @torch.jit.script
-def Rrs_minus(Rrs,params: AbsorptionParams):
+def Rrs_minus(Rrs,constant = None):
     """
     Empirical solution for the effect of the interface Atmosphere-sea.
      Lee et al., 2002
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return Rrs/(params.T+params.gammaQ*Rrs)
+    return Rrs/(constant['T']+constant['gammaQ']*Rrs)
 
 @torch.jit.script
-def Rrs_plus(Rrs,params: AbsorptionParams):
+def Rrs_plus(Rrs,constant = None):
     """
     Empirical solution for the effect of the interface Atmosphere-sea.
      Lee et al., 2002
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    return Rrs*params.T/(1-params.gammaQ*Rrs)
+    return Rrs*constant['T']/(1-constant['gammaQ']*Rrs)
 
 @torch.jit.script
-def Rrs_MODEL(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params: AbsorptionParams):
+def Rrs_MODEL(E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis = None,constant = None):
     """
     Remote Sensing Reflectance.
     Aas and Højerslev, 1999.
     perturbation_factors is a dictionary with all the parameters that are been optimices in this Model. Are multiplicative factors between 0 and 2, that modify the value
     of some of the constants of the bio quimical model. 
     """
-    Rrs = E_u(0.,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,params)  /  \
-          (Q_rs(zenith,perturbation_factors)*(E_dir_o + E_dif_o)   )
-    return Rrs_plus( Rrs ,params)
+    Rrs = E_u(0,E_dif_o,E_dir_o,lambda_,zenith,PAR,chla,NAP,CDOM,perturbation_factors,axis = axis,constant = constant)  /  (   Q_rs(zenith,perturbation_factors,constant = constant)*(E_dir_o + E_dif_o)   )
+    return Rrs_plus( Rrs ,constant = constant)
 
 
 class Forward_Model(nn.Module):
@@ -553,6 +513,7 @@ class Forward_Model(nn.Module):
         """
         x_data: torch tensor. 
         """
+        
         if type(perturbation_factors_) == type(None):
             perturbations = self.perturbation_factors
         else:
@@ -560,27 +521,32 @@ class Forward_Model(nn.Module):
         if type(parameters) == type(None):
             if self.learning_chla == False:
                 print('Please provide a tensor with the value of chla,nap and cdom')
-            
-            Rrs = Rrs_MODEL(x_data[:,:,0],x_data[:,:,1],x_data[:,:,2],\
-                            x_data[:,:,3],x_data[:,:,4],torch.exp(self.chparam[:,:,0]),torch.exp(self.chparam[:,:,1]),torch.exp(self.chparam[:,:,2]),perturbations,constant)
 
-            if type(axis) != type(None):
-                Rrs = Rrs[:,axis]
-               
-            return Rrs.to(self.precision)
+            if type(axis) == type(None):
             
+                Rrs = Rrs_MODEL(x_data[:,:,0],x_data[:,:,1],x_data[:,:,2],\
+                                x_data[:,:,3],x_data[:,:,4],torch.exp(self.chparam[:,:,0]),torch.exp(self.chparam[:,:,1]),torch.exp(self.chparam[:,:,2]),perturbations,constant = constant)
+            
+                return Rrs.to(self.precision)
+            else:
+
+                Rrs = Rrs_MODEL(x_data[:,axis,0],x_data[:,axis,1],x_data[:,axis,2],\
+                                x_data[:,axis,3],x_data[:,axis,4],torch.exp(self.chparam[:,:,0]),torch.exp(self.chparam[:,:,1]),torch.exp(self.chparam[:,:,2]),perturbations,constant = constant)
+            
+                return Rrs.to(self.precision)
+
         else:
-
-            Rrs = Rrs_MODEL(x_data[:,:,0],x_data[:,:,1],x_data[:,:,2],\
-                                x_data[:,:,3],x_data[:,:,4],torch.exp(parameters[:,:,0]),torch.exp(parameters[:,:,1]),torch.exp(parameters[:,:,2]),perturbations,constant)
-            
-
-            if type(axis) != type(None):
-                Rrs = Rrs[:,axis]
+            if type(axis) == type(None):
                 
-                
-            return Rrs.to(self.precision)
+                Rrs = Rrs_MODEL(x_data[:,:,0],x_data[:,:,1],x_data[:,:,2],\
+                                x_data[:,:,3],x_data[:,:,4],torch.exp(parameters[:,:,0]),torch.exp(parameters[:,:,1]),torch.exp(parameters[:,:,2]),perturbations,constant = constant)
             
+                return Rrs.to(self.precision)
+            else:
+                Rrs = Rrs_MODEL(x_data[:,axis,0],x_data[:,axis,1],x_data[:,axis,2],\
+                                x_data[:,axis,3],x_data[:,axis,4],torch.exp(parameters[:,:,0]),torch.exp(parameters[:,:,1]),torch.exp(parameters[:,:,2]),perturbations,constant = constant)
+                return Rrs.to(self.precision)
+
 ######Functions for error propagation########
 def error_propagation(df,sigma):
 
@@ -618,17 +584,20 @@ class evaluate_model_class():
         else:
             perturbations = perturbation_factors_
             
-
-        if self.which_parameters == 'chla': 
-            kd_values = kd(9,self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
-                           self.X[:,:,3],self.X[:,:,4],torch.exp(parameters_eval[:,:,0]),torch.exp(parameters_eval[:,:,1]),torch.exp(parameters_eval[:,:,2]),perturbations,self.constant)
-                
-        elif self.which_parameters == 'perturbations':
-            kd_values = kd(9,self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
-                           self.X[:,:,3],self.X[:,:,4],torch.exp(self.chla[:,:,0]),torch.exp(self.chla[:,:,1]),torch.exp(self.chla[:,:,2]),parameters_eval,self.constant)
-        if self.axis != None:
-            kd_values = kd_values[:,axis]
-            
+        if self.axis == None:
+            if self.which_parameters == 'chla': 
+                kd_values = kd(9,self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
+                               self.X[:,:,3],self.X[:,:,4],torch.exp(parameters_eval[:,:,0]),torch.exp(parameters_eval[:,:,1]),torch.exp(parameters_eval[:,:,2]),perturbations,constant = self.constant)
+            elif self.which_parameters == 'perturbations':
+                kd_values = kd(9,self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
+                               self.X[:,:,3],self.X[:,:,4],torch.exp(self.chla[:,:,0]),torch.exp(self.chla[:,:,1]),torch.exp(self.chla[:,:,2]),parameters_eval,constant = self.constant)
+        else:
+            if self.which_parameters == 'chla': 
+                kd_values = kd(9,self.X[:,self.axis,0],self.X[:,self.axis,1],self.X[:,self.axis,2],\
+                               self.X[:,self.axis,3],self.X[:,self.axis,4],torch.exp(parameters_eval[:,:,0]),torch.exp(parameters_eval[:,:,1]),torch.exp(parameters_eval[:,:,2]),perturbations,axis = self.axis,constant = self.constant)
+            elif self.which_parameters == 'perturbations':
+                kd_values = kd(9,self.X[:,self.axis,0],self.X[:,self.axis,1],self.X[:,self.axis,2],\
+                               self.X[:,self.axis,3],self.X[:,self.axis,4],torch.exp(self.chla[:,:,0]),torch.exp(self.chla[:,:,1]),torch.exp(self.chla[:,:,2]),parameters_eval,axis = self.axis,constant = self.constant)
         return kd_values
 
     def bbp_der(self,parameters_eval,perturbation_factors_ = None):
@@ -637,20 +606,23 @@ class evaluate_model_class():
             perturbations = self.model.perturbation_factors
         else:
             perturbations = perturbation_factors_
-            
-        if self.which_parameters == 'chla': 
-            bbp_values = bbp(self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
-                             self.X[:,:,3],self.X[:,:,4],torch.exp(parameters_eval[:,:,0]),torch.exp(parameters_eval[:,:,1]),torch.exp(parameters_eval[:,:,2]),perturbations,self.constant)
-                
-        elif self.which_parameters == 'perturbations':
-            bbp_values = bbp(self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
-                             self.X[:,:,3],self.X[:,:,4],torch.exp(self.chla[:,:,0]),torch.exp(self.chla[:,:,1]),torch.exp(self.chla[:,:,2]),parameters_eval,self.constant)
-            
-        if self.axis != None:
-            return bbp_values[:,axis]
-                        
-        return bbp_values[:,[1,2,4]]
-        
+        if self.axis == None:
+            if self.which_parameters == 'chla': 
+                bbp_values = bbp(self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
+                                 self.X[:,:,3],self.X[:,:,4],torch.exp(parameters_eval[:,:,0]),torch.exp(parameters_eval[:,:,1]),torch.exp(parameters_eval[:,:,2]),perturbations,constant = self.constant)
+            elif self.which_parameters == 'perturbations':
+                bbp_values = bbp(self.X[:,:,0],self.X[:,:,1],self.X[:,:,2],\
+                                 self.X[:,:,3],self.X[:,:,4],torch.exp(self.chla[:,:,0]),torch.exp(self.chla[:,:,1]),torch.exp(self.chla[:,:,2]),parameters_eval,constant = self.constant)
+            return bbp_values[:,[1,2,4]]
+        else:
+            if self.which_parameters == 'chla': 
+                bbp_values = bbp(self.X[:,self.axis,0],self.X[:,self.axis,1],self.X[:,self.axis,2],\
+                                 self.X[:,self.axis,3],self.X[:,self.axis,4],torch.exp(parameters_eval[:,:,0]),torch.exp(parameters_eval[:,:,1]),torch.exp(parameters_eval[:,:,2]),perturbations,axis=self.axis,constant = self.constant)
+            elif self.which_parameters == 'perturbations':
+                bbp_values = bbp(self.X[:,self.axis,0],self.X[:,self.axis,1],self.X[:,self.axis,2],\
+                                 self.X[:,self.axis,3],self.X[:,self.axis,4],torch.exp(self.chla[:,:,0]),torch.exp(self.chla[:,:,1]),torch.exp(self.chla[:,:,2]),parameters_eval,axis=self.axis,constant = self.constant)
+
+            return bbp_values
 
 
 class RRS_loss(nn.Module):

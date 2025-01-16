@@ -422,7 +422,7 @@ if __name__ == '__main__':
         ncA.close()
         ncB.close()
         
-        
+    
     ncfile = netCDF4.Dataset(conf_['output_datadir'] + '/' + conf_['output_prefix'] + \
                              '_' +OUT_Timelist[0].strftime('%Y%m%d_%H:%M:%S')+ '-' + \
                              OUT_Timelist[-1].strftime('%Y%m%d_%H:%M%S') +'.nc', "w", format="NETCDF4")

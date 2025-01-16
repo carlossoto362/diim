@@ -156,17 +156,17 @@ class NN_second_layer(nn.Module):
         z_hat = (z_hat * self.y_mul[0] + self.y_add[0]).unsqueeze(1)
         image = self.rearange_RRS(image)
         
-        rrs_ = self.Forward_Model(image,parameters = z_hat,constant = self.constant)
         
+        rrs_ = self.Forward_Model(image,parameters = z_hat,constant = self.constant)
         
 
         rrs_ = (rrs_ - self.x_add[:5])/self.x_mul[:5]
  
-        kd_ = self.kd(9.,image[:,:,0],image[:,:,1],image[:,:,2],image[:,:,3],image[:,:,4],torch.exp(z_hat[:,:,0]),torch.exp(z_hat[:,:,1]),torch.exp(z_hat[:,:,2]),self.Forward_Model.perturbation_factors,self.constant)
+        kd_ = self.kd(9.,image[:,:,0],image[:,:,1],image[:,:,2],image[:,:,3],image[:,:,4],torch.exp(z_hat[:,:,0]),torch.exp(z_hat[:,:,1]),torch.exp(z_hat[:,:,2]),self.Forward_Model.perturbation_factors,constant = self.constant)
 
         kd_ = (kd_  - self.y_add[1:6])/self.y_mul[1:6]
 
-        bbp_ = self.bbp(image[:,:,0],image[:,:,1],image[:,:,2],image[:,:,3],image[:,:,4],torch.exp(z_hat[:,:,0]),torch.exp(z_hat[:,:,1]),torch.exp(z_hat[:,:,2]),self.Forward_Model.perturbation_factors,self.constant)[:,[1,2,4]]
+        bbp_ = self.bbp(image[:,:,0],image[:,:,1],image[:,:,2],image[:,:,3],image[:,:,4],torch.exp(z_hat[:,:,0]),torch.exp(z_hat[:,:,1]),torch.exp(z_hat[:,:,2]),self.Forward_Model.perturbation_factors,constant = self.constant)[:,[1,2,4]]
 
         bbp_ = (bbp_ - self.y_add[6:9])/self.y_mul[6:9]
 

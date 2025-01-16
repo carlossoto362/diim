@@ -1,0 +1,21 @@
+name: diim_py
+dependencies:
+ - pytorch
+ - ConfigSpace
+ - matplotlib
+ - matplotlib-inline
+ - mdurl
+ - numpy
+ - networkx
+ - pandas
+ - ray-default
+ - scipy
+ - seaborn
+ - sympy
+ - pvlib
+ - tqdm
+ - pyarrow
+ - tensorboardX
+ - netCDF4
+ - mpi4py
+ - numba

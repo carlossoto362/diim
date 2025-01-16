@@ -2,8 +2,8 @@ name: diim_py
 channels:
  - conda-forge
 dependencies:
+ - python == 3.9
  - ConfigSpace>=1.1.1
- - constrained-linear-regression>=0.0.4
  - matplotlib>=3.7
  - matplotlib-inline>=0.1.7
  - mdurl>=0.1.2
@@ -11,7 +11,7 @@ dependencies:
  - numpy>=1.24
  - networkx>=2.8.8
  - pandas>=2
- - ray>=2.1
+ - ray-default
  - scipy>=1.1
  - seaborn>=0.13.2
  - sympy>=1.12

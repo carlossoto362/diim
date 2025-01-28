@@ -4,11 +4,9 @@ import os
 import time
 import numpy as np
 import torch
-from torch.utils.data import DataLoader,random_split
+from torch.utils.data import DataLoader
 from torch import nn
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import scipy
 import matplotlib.pyplot as plt
 import scipy
 from datetime import datetime

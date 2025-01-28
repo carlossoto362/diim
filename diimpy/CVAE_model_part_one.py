@@ -13,7 +13,6 @@ import numpy as np
 import torch
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch import nn
-from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader,random_split
 
 from ray import tune

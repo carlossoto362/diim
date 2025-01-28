@@ -7,8 +7,9 @@ import pandas as pd
 from scipy import stats
 import os
 import sys
-from typing import NamedTuple
-from diimpy.Forward_module import AbsorptionParams
+
+
+
 
 if 'DIIM_PATH' in os.environ:
     HOME_PATH = MODEL_HOME = os.environ["DIIM_PATH"]
@@ -17,6 +18,58 @@ else:
     print("Missing local variable DIIM_PATH. \nPlease add it with '$:export DIIM_PATH=path/to/diim'.")
     sys.exit()
 
+@torch.jit.script
+class AbsorptionParams:
+    def __init__(self, dCDOM: float,
+                 sCDOM: float,
+                 dNAP: float,
+                 sNAP: float,
+                 absortion_w: torch.Tensor,
+                 absortion_PH: torch.Tensor,
+                 eNAP: float,
+                 fNAP: float,
+                 linear_regression_slope_b: float,
+                 linear_regression_intercept_b: float,
+                 Theta_o: float,
+                 Theta_min: float,
+                 beta: float,
+                 sigma: float,
+                 backscattering_w: torch.Tensor,
+                 linear_regression_slope_s: float,
+                 linear_regression_intercept_s: float,
+                 scattering_w: torch.Tensor,
+                 vs: float,
+                 rs: float,
+                 vu: float,
+                 ru: float,
+                 rd: float,
+                 T: float,
+                 gammaQ: float):
+        self.dCDOM=dCDOM
+        self.sCDOM = sCDOM
+        self.dNAP = dNAP
+        self.sNAP = sNAP
+        self.absortion_w = absortion_w
+        self.absortion_PH = absortion_PH
+        self.eNAP = eNAP
+        self.fNAP = fNAP
+        self.linear_regression_slope_b = linear_regression_slope_b
+        self.linear_regression_slope_s = linear_regression_slope_s
+        self.linear_regression_intercept_b = linear_regression_intercept_b
+        self.linear_regression_intercept_s = linear_regression_intercept_s
+        self.Theta_o = Theta_o
+        self.Theta_min = Theta_min
+        self.beta = beta
+        self.sigma = sigma
+        self.backscattering_w = backscattering_w
+        self.scattering_w = scattering_w
+        self.vs = vs
+        self.rs = rs
+        self.vu = vu
+        self.ru = ru
+        self.rd = rd
+        self.T = T
+        self.gammaQ = gammaQ
 
 class customTensorData():
 

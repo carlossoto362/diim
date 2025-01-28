@@ -49,7 +49,7 @@ add_bashrc_line:
 
 setup: requirements.txt
 	echo $(ENVDIR)
-	$(ENVDIR)/diim_env/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+	$(ENVDIR)/diim_env/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
 	$(ENVDIR)/diim_env/bin/pip install -r requirements.txt
 	cp -r ./diimpy $(ENVDIR)/diim_env/lib/$(PYTHON_VERSION_)/site-packages/
 	cp -r ./extern/bit.sea/src/bitsea $(ENVDIR)/diim_env/lib/$(PYTHON_VERSION_)/site-packages/
@@ -60,7 +60,11 @@ setup: requirements.txt
 oasim_make:
 	git submodule init
 	git submodule update
-	cd extern/OASIM_ATM/ && ./build_$(OASIM_VERSION)_$(OASIM_COMPILER).sh
+	cd extern/OASIM_ATM/ && ./build_$(OASIM_VERSION)_$(OASIM_COMPILER).sh && cd builds/$(OASIM_VERSION)_$(OASIM_COMPILER)/ && make
+	cp extern/OASIM_ATM/builds/release_gcc/OASIMlib/liboasim* map/oasim_map
+
+bitsea_make:
+	cd extern/bit.sea && pip install .
 
 clean:
 	@rm -f -r $(DIIM_ENV_PATH)/diim_env

@@ -1,22 +1,17 @@
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import pandas as pd
 import os
 import scipy
-from scipy import stats
-from torch.utils.data import DataLoader,random_split
+from torch.utils.data import DataLoader
 import time
 import sys
-import seaborn as sb
 import diimpy.Forward_module as fm
 import diimpy.read_data_module as rdm
 from torch.utils.data import DataLoader
-from multiprocessing.pool import Pool
-import matplotlib.colors as mcolors
 from torch import nn
-from diimpy.CVAE_model_part_two import NN_second_layer
+from diimpy.CVAE_final import NN_second_layer
 from tqdm import tqdm
 
 
@@ -154,7 +149,7 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
     
         output = {'X_hat':X_hat,'kd_hat':kd_hat,'bbp_hat':bbp_hat,'RRS_hat':last_rrs}
     
-        print("time for training...",time.time() - time_init)
+        #print("time for training...",time.time() - time_init)
         return output
     elif kind == 'parameter_estimation':
         

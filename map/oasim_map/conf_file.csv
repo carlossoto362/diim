@@ -13,4 +13,5 @@ wavelengths_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data
 oasimlib_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_map/liboasim-py.so
 oasim_config_file /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_map/oasim_config.yaml
 output_prefix oasim_med
-output_datadir /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_map/maps
+#output_datadir /g100_work/OGS23_PRACE_IT/csoto/DIIM/map/oasim_map/maps
+output_datadir /g100_scratch/userexternal/csotolop/OASIM_maps

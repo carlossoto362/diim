@@ -17,3 +17,5 @@ tensorboardX
 netCDF4
 mpi4py
 numba
+scikit-learn
+geopy

@@ -1,7 +1,7 @@
 input:
-  atmospheric_data_file: ../extern/OASIM_ATM/test/data/atmo.txt
-  absorption_data_file: ../extern/OASIM_ATM/test/data/abso.txt
-  cloud_slingo_file: ../extern/OASIM_ATM/test/data/slingo.txt
+  atmospheric_data_file: /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data/atmo.txt
+  absorption_data_file: /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data/abso.txt
+  cloud_slingo_file: /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data/slingo.txt
 compute:
   integration_step_secs: 300.0
   max_integration_steps: 1000
@@ -10,4 +10,4 @@ compute:
   am: 1.0
   vi: 25.0
 output:
-  bin_file: ../extern/OASIM_ATM/test/data/bin.txt
+  bin_file: /g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data/bin.txt

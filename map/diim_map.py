@@ -7,9 +7,8 @@ import sys
 import os
 from scipy import stats
 from datetime import datetime, timedelta
-from diimpy.Forward_module import Forward_Model,RRS_loss
+from diimpy.Forward_module import Forward_Model,RRS_loss,evaluate_model_class,error_propagation
 from diimpy.read_data_module import read_constants
-from diimpy.bayesian_inversion import train_loop
 from diimpy.CVAE_final import NN_second_layer
 import pandas as pd
 from mpi4py import MPI
@@ -202,8 +201,8 @@ class read_map_class():
             y_data[:,3] = RRS_data['RRS510'][0,:,:].reshape((n_points))
             y_data[:,4] = RRS_data['RRS555'][0,:,:].reshape((n_points))
 
-            nan_y_points = np.all(y_data<-900,axis=1)
-            nan_x_points = np.all(x_data<-900,axis=1)
+            nan_y_points = np.any(y_data<-900,axis=1)
+            nan_x_points = np.any(x_data<-900,axis=1)
             nan_points_ = nan_y_points | nan_x_points
             nan_points = np.where(nan_points_ == True)[0]
             non_nan_points = np.where(nan_points_ == False)[0]
@@ -291,11 +290,159 @@ def local_initial_conditions_nn(F_model,constant,data,precision = torch.float32,
     z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model_NN(data_rearanged) #we are working with \lambda as imput, but the NN dosent use it.
     mu_z = (mu_z* model_NN.y_mul[0] + model_NN.y_add[0]).clone().detach()
 
+    if torch.isnan(mu_z).any():
+        mu_z[torch.argwhere(torch.isnan(mu_z))] = torch.rand(mu_z[torch.argwhere(torch.isnan(mu_z))].shape,dtype=torch.float32)
+
     state_dict = F_model.state_dict()
     state_dict['chparam']  = mu_z.unsqueeze(1)
     F_model.load_state_dict(state_dict)
     #print('time for NN data,', time.time() - init_time_)
     return mu_z
+
+def get_jacobian_components(original_jacobian,len_: int,comp: int):
+    new_jacobian = torch.empty((len_,5,3))
+    map(lambda i: new_jacobian[i].append(original_jacobian[i,:,i,:,:].reshape(comp,3)),range(len_))
+    return new_jacobian
+
+def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device = 'cpu',constant = None,perturbation_factors_ = None,calc_kd=True,calc_bbp=True):
+    """
+    The train loop evaluates the Remote Sensing Reflectance RRS for each wavelength >>>pred=model(data_i), evaluates the loss function
+    >>>loss=loss_fn(pred,y), evaluates the gradient of RRS with respect to the parameters, >>>loss.backward(), modifies the value of the parameters according to the optimizer criterium, >>>optimizer.step(),
+    sets the gradient of RRS to zero. After this, compute the approximate covariance matrix of the active constituents to, finally, compute kd and bbp with uncertainty. 
+    
+    Parameters:
+
+      data_i: tuple of datasets (X,Y), X is the input data E_dir(lambda), E_dif(lambda), lambda, zenith(lambda) and PAR(lambda), a tensor of dimension (*,5,5), where * stands for the number of days evaluated. Y is the satellite data RRS(lambda), a tensor of dimension (*,5).
+     
+      model: RRS. Is a pytorch object, with chparam as learnable parameters of dimension $(*,1,3)$, a variable called perturbation_factors_\
+             of dimension 14, and a forward function that returns the predicted RRS for the five values of lambda 412.5, 442.5, 490, 510 and 555. 
+      
+      loss_fn: The RRS_loss object, is an object with the variables 
+               x_a: mean value of the prior values for chla, nap and cdom, with dimension (3).
+               s_a: covariance matrix of the prior for chla, nap and cdom, dimension (3,3).
+               s_e: covariance matrix of RRS. Dimension (5,5).
+               s_a_inverse: the inverse of s_a
+               s_e_inverse: the inverse of s_e
+
+      optimizer: a pytorch optimizer object. 
+
+      N: the maximum number of iterations for the train loop. 
+
+      kind: can be "all", "parameter_estimation" or "rrs". 
+            if kind = "all", train_loop returns a dictionary with {'X_hat':X_hat,'kd_hat':kd_hat,'bbp_hat':bbp_hat,'RRS_hat':last_rrs}, where X_hat is the predicted\
+            chlorophyll, NAP and CDOM, kd_hat is the predicted down light attenuation coefficient, bbp_hat is the predicted backward scattering and RRS is \
+            the predicted Remote Sensing Reflectance. All with uncertainty.  Example: X_hat[0] = [X_hat_412.5[0],X_hat_412_delta[0],X_hat_442[0],X_hat_442_delta[0],...,X_hat_555_delta[0]].
+            If kind = "parameter_estimation", train_loop returns a (*,9) tensor, with the first element being the prediction of chlorophyll,\
+            the next 5 the predictions for kd, and the last three, the predictions for bbp. 
+            If kind = "rrs", train_loop will return the prediction of RRS, the history of predictions for chlorophyll, NAP and CDOM, and the history of loss_functions, for all the iterations on the loop. 
+
+      num_days: The number of days for which the inversion is being performed. Usually is the first dimension of X or Y in data_i. Default is equal to 1. 
+      
+      my_device: torch devise, could be 'cpu', 'cuda', 'mps', etc. 
+      
+      constant: Set of constants for the model. Is a dictionary, necessary for running the forward model. See diimpy/read_data_module.py.
+
+      perturbation factors_: torch tensor of dimension (14). Numbers that multiply the constants of the forward model. 
+
+      Scheduler: Defines if use a scheduler in the Adam Algorithm, it can accelerate the convergence of the algorithm. 
+    """
+    past_pred=torch.empty((N,num_days,3))
+
+    criterium = 1
+    criterium_2 = 0
+    i=0
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+
+    X = data_i[0]
+    Y = data_i[1]
+    s_a = (loss_fn.s_a)
+    s_e = (loss_fn.s_e)
+    s_e_inverse = (loss_fn.s_e_inverse)
+    s_a_inverse = (loss_fn.s_a_inverse)
+
+    dR = (1e-13)
+    ls_val=[]
+    init_time = time.time()
+    while (((criterium >dR ) & (i<N)) or ((criterium_2 < 100)&(i<N))):
+        
+        pred = model(X,constant = constant,perturbation_factors_ = perturbation_factors_)
+        
+        if torch.isnan(pred).any():
+            where_nan = torch.argwhere(torch.isnan(pred))[0]
+            if where_nan[0] == 0:
+                pred[where_nan] = (pred[where_nan[0]+1,where_nan[1]].clone())
+            elif where_nan[0] == len(pred[0]):
+                pred[where_nan] = (pred[where_nan[0]-1,where_nan[1]].clone())
+            else:
+                pred[where_nan] = (pred[where_nan[0]+1,where_nan[1]].clone() + pred[where_nan[0]-1,where_nan[1]].clone())/2
+                
+        loss = loss_fn(Y,pred,model.state_dict()['chparam'])
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
+        
+        ls_val.append(loss.item())
+        past_pred[i] = model.state_dict()['chparam'][:,0,:]
+
+        if i != 0:
+            criterium = ls_val[-2] - ls_val[-1]
+        if criterium <=dR:
+            criterium_2+=1
+        i+=1
+        scheduler.step(loss)
+        
+    last_rrs = pred.clone().detach()
+    
+    print('one loop',time.time() - init_time)
+    init_time = time.time()
+    
+    parameters_eval = list(model.parameters())[0].clone().detach()
+    evaluate_model = evaluate_model_class(model=model,X=X,constant = constant)
+    
+
+    K_x_ = torch.autograd.functional.jacobian(evaluate_model.model_der,inputs=(parameters_eval))
+    K_x = get_jacobian_components(k_x_,len(parameters_eval),5)
+    del K_x_
+        
+    S_hat = torch.inverse( torch.transpose(K_x,1,2) @ ( s_e_inverse @ K_x ) + s_a_inverse  )
+        
+    X_hat = np.empty((len(parameters_eval),6))
+    X_hat[:,::2] = past_pred[last_i-1].clone().detach()
+    X_hat[:,1::2] = torch.sqrt(torch.diagonal(S_hat,dim1=1,dim2=2).clone().detach())
+    output = {'X_hat':X_hat,'RRS_hat':last_rrs}
+    print('uncertainty computation',time.time() - init_time)
+    if calc_kd:
+        init_time = time.time()
+    
+        kd_hat = torch.empty((len(parameters_eval),10))
+        kd_derivative_ = torch.autograd.functional.jacobian(evaluate_model.kd_der,inputs=(parameters_eval))
+        kd_derivative = get_jacobian_components(kd_derivative_,len(parameters_eval),5)
+        del kd_derivative_
+               
+        kd_delta = error_propagation(kd_derivative,S_hat)
+        kd_hat[:,::2] = kd_values.clone().detach()
+        kd_hat[:,1::2] = torch.sqrt(kd_delta).clone().detach()
+        output['kd_hat'] = kd_hat
+    if calc_bbp:
+
+        bbp_hat = torch.empty((len(parameters_eval),6))
+        bbp_values = evaluate_model.bbp_der(parameters_eval)
+    
+        bbp_derivative_ = torch.autograd.functional.jacobian(evaluate_model.bbp_der,inputs=(parameters_eval))
+        bbp_derivative = get_jacobian_components(bbp_derivative_,len(parameters_eval),3)
+        del bbp_derivative_
+        
+        bbp_delta = error_propagation(bbp_derivative,S_hat)
+        bbp_hat[:,::2] = bbp_values.clone().detach()
+        bbp_hat[:,1::2] = torch.sqrt(bbp_delta).clone().detach()
+        output['bbp_hat'] = bbp_hat
+    
+    print('kd and bbp',time.time() - init_time)
+    sys.exit()
+    
+    #print("time for training...",time.time() - time_init)
+    return output
+
 
 def create_nan_array(shape):
         nan_array = np.empty(shape)
@@ -412,7 +559,7 @@ def set_mpi(master_addr,master_port,num_threads):
     torch.set_num_threads(num_threads)
     return comm,rank,nranks
 
-def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',oasim_data_path=HOME_PATH + '/map/oasim_map/maps/OASIM_MED.nc',rrs_data_path=HOME_PATH + '/map/RRS/RRS_MED.nc',PAR_path=HOME_PATH + '/map/PAR',zenith_path=HOME_PATH + '/map/zenith',date_str='20000101-00:00:00',rank=0,nranks=1,comm=None,my_device='cpu'):
+def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',oasim_data_path=HOME_PATH + '/map/oasim_map/maps/OASIM_MED.nc',rrs_data_path=HOME_PATH + '/map/RRS/RRS_MED.nc',PAR_path=HOME_PATH + '/map/PAR',zenith_path=HOME_PATH + '/map/zenith',date_str='20000101-00:00:00',rank=0,nranks=1,comm=None,my_device='cpu',perturbation_factors=torch.ones(14, dtype=torch.float32),constant=None,calc_kd=True,calc_bbp=True):
     
     """
     Inversts the rrs, and store the outputs in scratch_path. These outputs are intented to be used to create a netcdf with an independent function, later. Use in combination of mpi4py, comm is used to place barriers. 
@@ -455,9 +602,9 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
         dataset = read_map_class(oasim_data_file=oasim_data_path,\
                                  rrs_data_file=rrs_data_path,time_utc = time_utc,scratch_path = scratch_path ,\
                                  PAR_folder = PAR_path,zenith_folder = zenith_path,store_data = True,dateformat = dateformat)
-    
     comm.Barrier()
 
+    
     if rank != 0 :
         dataset = read_map_class(oasim_data_file=oasim_data_path,\
                                  rrs_data_file=rrs_data_path,time_utc = time_utc,scratch_path = scratch_path ,\
@@ -468,7 +615,7 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
     s_a = torch.eye(3) * 4.9
     s_e = (torch.eye(5)*torch.tensor([1.5e-3,1.2e-3,1e-3,8.6e-4,5.7e-4]))**(2)#validation rmse from https://catalogue.marine.copernicus.eu/documents/QUID/CMEMS-OC-QUID-009-141to144-151to154.pdf
 
-    batch_size = 1000#len(dataset)
+    batch_size = 100#len(dataset)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     if rank == 0:
@@ -494,13 +641,10 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
     comm.Barrier()
     
     for i,data in itertools.islice(enumerate(dataloader),worker_i,None,lenght_iter):
-
+        
         if (nranks == 1) or (rank != 0):
-            
             len_batch = len(data[0])
-            #if nranks == 1:
-
-            #print('Working iterations {} to {} from {}'.format(batch_size*i,batch_size*i + len_batch,len(dataset)))
+            
             model = Forward_Model(num_days=len_batch).to(my_device)
             model.perturbation_factors = perturbation_factors
             chla_NN_sen = local_initial_conditions_nn(model,constant,data,precision = torch.float32,my_device = 'cpu').numpy()
@@ -509,70 +653,91 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
             output = train_loop(data,model,loss,optimizer,4000,kind='all',\
                                       num_days=len_batch,constant = constant,perturbation_factors_ = perturbation_factors, scheduler = True)
 
+            if np.isnan(output['X_hat']).all():
+                model = Forward_Model(num_days=len_batch).to(my_device)
+                model.perturbation_factors = perturbation_factors
+                loss = RRS_loss(x_a,s_a,s_e,num_days=len_batch,my_device = my_device)
+                optimizer = torch.optim.Adam(model.parameters(),lr=lr)
+                output = train_loop(data,model,loss,optimizer,4000,kind='all',\
+                                      num_days=len_batch,constant = constant,perturbation_factors_ = perturbation_factors,calc_kd = calc_kd, calc_bbp = calc_bbp)
+                if np.isnan(output['X_hat']).all():
+                    print(rank,i,'had a nan value for date, ',date_str)
+            
             chla_log_sen = output['X_hat']
-            kd_log_sen = output['kd_hat']
-            bbp_log_sen = output['bbp_hat']
             RRS_log_sen = output['RRS_hat']
+            if calc_kd: kd_log_sen = output['kd_hat']
+            if calc_bbp: bbp_log_sen = output['bbp_hat']
+            
+            
+
 
             if nranks!=1:
                 comm.Send([chla_NN_sen.astype(np.float32), MPI.FLOAT],dest=0,tag=1)
                 comm.Send([chla_log_sen.astype(np.float32), MPI.FLOAT],dest=0,tag=2)
-                comm.Send([kd_log_sen.numpy().astype(np.float32), MPI.FLOAT],dest=0,tag=3)
-                comm.Send([bbp_log_sen.numpy().astype(np.float32), MPI.FLOAT],dest=0,tag=4)
                 comm.Send([RRS_log_sen.numpy().astype(np.float32), MPI.FLOAT],dest=0,tag=5)
-                del chla_log_sen
-                del kd_log_sen
-                del bbp_log_sen
-                del RRS_log_sen
-                del model
-                del optimizer
-                del loss
-                del chla_NN_sen
-                del output
-            else:
-                chla_NN_rec[batch_size*i:batch_size*i + len_batch] = chla_NN_sen
-                chla_log_rec[batch_size*i:batch_size*i + len_batch] = chla_log_sen
-                kd_log_rec[batch_size*i:batch_size*i + len_batch] = kd_log_sen
-                bbp_log_rec[batch_size*i:batch_size*i + len_batch] = bbp_log_sen
-                RRS_log_rec[batch_size*i:batch_size*i + len_batch] = RRS_log_sen
+                if calc_kd: comm.Send([kd_log_sen.numpy().astype(np.float32), MPI.FLOAT],dest=0,tag=3)
+                if calc_bbp: comm.Send([bbp_log_sen.numpy().astype(np.float32), MPI.FLOAT],dest=0,tag=4)
+
                 del chla_NN_sen
                 del chla_log_sen
-                del kd_log_sen
                 del RRS_log_sen
-                del bbp_log_sen
+                if calc_kd: del kd_log_sen
+                if calc_bbp: del bbp_log_sen
                 del model
                 del output
                 del optimizer
                 del loss
 
+            else:
+                chla_NN_rec[batch_size*i:batch_size*i + len_batch] = chla_NN_sen
+                chla_log_rec[batch_size*i:batch_size*i + len_batch] = chla_log_sen
+                RRS_log_rec[batch_size*i:batch_size*i + len_batch] = RRS_log_sen
+                if calc_kd: kd_log_rec[batch_size*i:batch_size*i + len_batch] = kd_log_sen
+                if calc_bbp: bbp_log_rec[batch_size*i:batch_size*i + len_batch] = bbp_log_sen
                 
-        if (rank == 0) & (nranks!=1):
+                del chla_NN_sen
+                del chla_log_sen
+                del RRS_log_sen
+                if calc_kd: del kd_log_sen
+                if calc_bbp: del bbp_log_sen
+                del model
+                del output
+                del optimizer
+                del loss
+
+        elif (rank == 0) & (nranks!=1):
             len_batch = len(data[0])
             rank_of_worker_sender = (i%n_workers) + 1
             comm.Recv([ chla_NN_rec[batch_size*i:batch_size*i + len_batch],MPI.FLOAT],source=rank_of_worker_sender,tag=1 )
             comm.Recv([ chla_log_rec[batch_size*i:batch_size*i + len_batch],MPI.FLOAT],source=rank_of_worker_sender,tag=2 )
-            comm.Recv([ kd_log_rec[batch_size*i:batch_size*i + len_batch],MPI.FLOAT],source=rank_of_worker_sender,tag=3 )
-            comm.Recv([ bbp_log_rec[batch_size*i:batch_size*i + len_batch],MPI.FLOAT],source=rank_of_worker_sender,tag=4 )
             comm.Recv([ RRS_log_rec[batch_size*i:batch_size*i + len_batch],MPI.FLOAT],source=rank_of_worker_sender,tag=5 )
-            #print('communication received from rank {}, corresponding to elements from {} to {}'.format(rank_of_worker_sender,batch_size*i,batch_size*i + len_batch))
+            if calc_kd: comm.Recv([ kd_log_rec[batch_size*i:batch_size*i + len_batch],MPI.FLOAT],source=rank_of_worker_sender,tag=3 )
+            if calc_bbp: comm.Recv([ bbp_log_rec[batch_size*i:batch_size*i + len_batch],MPI.FLOAT],source=rank_of_worker_sender,tag=4 )
 
+            #print('communication received from rank {}, corresponding to elements from {} to {}'.format(rank_of_worker_sender,batch_size*i,batch_size*i + len_batch))
+            
     if rank == 0:
-        np.save(scratch_path+'/chla_NN.npy',chla_NN_rec)
-        np.save(scratch_path+'/chla_log.npy',chla_log_rec)
-        np.save(scratch_path+'/kd_log.npy',kd_log_rec)
-        np.save(scratch_path+'/bbp_log.npy',bbp_log_rec)
-        np.save(scratch_path+'/RRS_log.npy',RRS_log_rec)
+        np.save(scratch_path+'/chla_NN_'+date_str+'.npy',chla_NN_rec)
+        np.save(scratch_path+'/chla_log_'+date_str+'.npy',chla_log_rec)
+        np.save(scratch_path+'/RRS_log_'+date_str+'.npy',RRS_log_rec)
+        if calc_kd: np.save(scratch_path+'/kd_log_'+date_str+'.npy',kd_log_rec)
+        if calc_bbp: np.save(scratch_path+'/bbp_log_'+date_str+'.npy',bbp_log_rec)
         
     comm.Barrier()
     return dataset
 
-def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101'):
-    chla_NN_d = np.load(scratch_path + '/chla_NN.npy')
-    chla_log_d = np.load(scratch_path + '/chla_log.npy')
-    kd_d = np.load(scratch_path + '/kd_log.npy')
-    bbp_d = np.load(scratch_path + '/bbp_log.npy')
-    RRS_d = np.load(scratch_path + '/RRS_log.npy')
-
+def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101',calc_kd=True,calc_bbp=True,calc_NN = True,calc_rrs = True,calc_chla = True):
+    if calc_NN: chla_NN_d = np.load(scratch_path + '/chla_NN_'+date_str+'.npy')
+    if calc_NN: chla_NN_d[np.isinf(chla_NN_d)] = np.nan
+    if calc_chla: chla_log_d = np.load(scratch_path + '/chla_log_'+date_str+'.npy')
+    if calc_chla: chla_log_d[np.isinf(chla_log_d)] = np.nan
+    if calc_kd: kd_d = np.load(scratch_path + '/kd_log_'+date_str+'.npy')
+    if calc_kd: kd_d[np.isinf(kd_d)] = np.nan
+    if calc_bbp: bbp_d = np.load(scratch_path + '/bbp_log_'+date_str+'.npy')
+    if calc_bbp: bbp_d[np.isinf(bbp_d)] = np.nan
+    if calc_rrs: RRS_d = np.load(scratch_path + '/RRS_log_'+date_str+'.npy')
+    if calc_rrs: RRS_d[np.isinf(RRS_d)]
+    
     len_lat = dataset.len_lat
     len_lon = dataset.len_lon
 
@@ -580,42 +745,63 @@ def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101'
 
     def init_map(lambda_dependent=True,no_nan_values = -999.0,is_bbp=False):
         if lambda_dependent == True:
-            map_ = np.zeros((5,len_lat*len_lon))*-999.0
+            map_ = np.zeros((5,len_lat*len_lon))*np.nan
             if is_bbp == False:
                 map_[:,no_nan_points] = no_nan_values
-                
             else:
-                map_[[1,2,4]][:,no_nan_points] = no_nan_values
+                map_[1,no_nan_points] = no_nan_values[0,:]
+                map_[2,no_nan_points] = no_nan_values[0,:]
+                map_[4,no_nan_points] = no_nan_values[0,:]
             map_ = np.reshape(map_,(map_.shape[0],len_lat,len_lon))
+            
+
         else:
-            map_ = np.zeros((len_lat*len_lon)) * -999.0
+            map_ = np.zeros((len_lat*len_lon)) * np.nan
             map_[no_nan_points] = no_nan_values
             map_ = np.reshape(map_,(len_lat,len_lon))
 
         return map_
 
-    chla_NN = init_map(lambda_dependent = False,no_nan_values = chla_NN_d[:len(dataset),0])
-    nap_NN = init_map(lambda_dependent = False,no_nan_values = chla_NN_d[:len(dataset),1])
-    cdom_NN = init_map(lambda_dependent = False,no_nan_values = chla_NN_d[:len(dataset),2])
-    chla = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),0])
-    dchla = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),1])
-    nap = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),2])
-    dnap = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),3])
-    cdom = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),4])
-    dcdom = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),5])
+    #test = np.zeros(chla_log_d[:,0].shape)
+    #test[np.argwhere(chla_log_d[:,0]==-2.008570432662964)] = 1
+    #test_ = np.zeros(len_lat*len_lon)
+    #test_[no_nan_points] = test
+    #test_ = np.reshape(test_,(len_lat,len_lon))
+    #print(np.argwhere(test==1)[0])
+    #print(np.argwhere(test_==1)[0])
+    #sys.exit() 
+    
+    if calc_NN:
+        chla_NN = init_map(lambda_dependent = False,no_nan_values = chla_NN_d[:len(dataset),0])
+        nap_NN = init_map(lambda_dependent = False,no_nan_values = chla_NN_d[:len(dataset),1])
+        cdom_NN = init_map(lambda_dependent = False,no_nan_values = chla_NN_d[:len(dataset),2])
+        
+    
+    if calc_chla:
+        chla = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),0])
+        dchla = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),1])
+        nap = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),2])
+        dnap = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),3])
+        cdom = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),4])
+        dcdom = init_map(lambda_dependent = False,no_nan_values = chla_log_d[:len(dataset),5])
+    
+        del chla_NN_d
+        del chla_log_d
 
-    del chla_NN_d
-    del chla_log_d
+    if calc_kd:
+        kd = init_map(no_nan_values = kd_d[:len(dataset),::2].T)
+        dkd = init_map(no_nan_values = kd_d[:len(dataset),1::2].T)
+        del kd_d
 
-    kd = init_map(no_nan_values = kd_d[:len(dataset),::2].T)
-    dkd = init_map(no_nan_values = kd_d[:len(dataset),1::2].T)
-    bbp = init_map(no_nan_values = bbp_d[:len(dataset),::2].T,is_bbp=True)
-    dbbp = init_map(no_nan_values = bbp_d[:len(dataset),1::2].T,is_bbp=True)
-    RRS = init_map(no_nan_values = RRS_d[:len(dataset)].T)
+    if calc_bbp:
+        bbp = init_map(no_nan_values = bbp_d[:len(dataset),::2].T,is_bbp=True)
+        dbbp = init_map(no_nan_values = bbp_d[:len(dataset),1::2].T,is_bbp=True)
+        del bbp_d
 
-    del kd_d
-    del bbp_d
-    del RRS_d
+    if calc_rrs:
+        RRS = init_map(no_nan_values = RRS_d[:len(dataset)].T)
+        del RRS_d
+    
 
     mesh_lat = np.load(dataset.mesh_lat_path)
     mesh_lon = np.load(dataset.mesh_lon_path)
@@ -654,22 +840,25 @@ def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101'
     lat_var = group.createVariable('lat','f4',('lat',))
     lon_var = group.createVariable('lon','f4',('lon',))
     lambda_var = group.createVariable('lambda','f4',('lambda'))
-    
-    chla_NN_var = group.createVariable('chla_NN','f4',('time','lat','lon'))
-    nap_NN_var = group.createVariable('nap_NN','f4',('time','lat','lon'))
-    cdom_NN_var = group.createVariable('cdom_NN','f4',('time','lat','lon'))
-    chla_var = group.createVariable('chla','f4',('time','lat','lon'))
-    nap_var = group.createVariable('nap','f4',('time','lat','lon'))
-    cdom_var = group.createVariable('cdom','f4',('time','lat','lon'))
-    dchla_var = group.createVariable('dchla','f4',('time','lat','lon'))
-    dnap_var = group.createVariable('dnap','f4',('time','lat','lon'))
-    dcdom_var = group.createVariable('dcdom','f4',('time','lat','lon'))
-    
-    kd_var = group.createVariable('kd','f4',('time','lambda','lat','lon'))
-    dkd_var = group.createVariable('dkd','f4',('time','lambda','lat','lon'))
-    bbp_var = group.createVariable('bbp','f4',('time','lambda','lat','lon'))
-    dbbp_var = group.createVariable('dbbp','f4',('time','lambda','lat','lon'))
-    RRS_var = group.createVariable('RRS','f4',('time','lambda','lat','lon'))    
+
+    if calc_NN:
+        chla_NN_var = group.createVariable('chla_NN','f4',('time','lat','lon'))
+        nap_NN_var = group.createVariable('nap_NN','f4',('time','lat','lon'))
+        cdom_NN_var = group.createVariable('cdom_NN','f4',('time','lat','lon'))
+    if calc_chla:
+        chla_var = group.createVariable('chla','f4',('time','lat','lon'))
+        nap_var = group.createVariable('nap','f4',('time','lat','lon'))
+        cdom_var = group.createVariable('cdom','f4',('time','lat','lon'))
+        dchla_var = group.createVariable('dchla','f4',('time','lat','lon'))
+        dnap_var = group.createVariable('dnap','f4',('time','lat','lon'))
+        dcdom_var = group.createVariable('dcdom','f4',('time','lat','lon'))
+    if calc_kd:
+        kd_var = group.createVariable('kd','f4',('time','lambda','lat','lon'))
+        dkd_var = group.createVariable('dkd','f4',('time','lambda','lat','lon'))
+    if calc_bbp:
+        bbp_var = group.createVariable('bbp','f4',('time','lambda','lat','lon'))
+        dbbp_var = group.createVariable('dbbp','f4',('time','lambda','lat','lon'))
+    if calc_rrs: RRS_var = group.createVariable('RRS','f4',('time','lambda','lat','lon'))    
     
     def fill_atributes(var,long_name,axis,units,calendar='Gregorian',valid_min=False,valid_max=False,missing_value=-999.0):
         var.long_name = long_name
@@ -686,59 +875,68 @@ def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101'
     fill_atributes(lon_var,long_name = 'longitude',axis='X',units='degrees_east',valid_min=np.min(lon),valid_max=np.max(lon),missing_value=False)
     fill_atributes(lambda_var,long_name='wavelenght',axis='lambda',units='nanometers',valid_min = 412.5,valid_max=555,missing_value=False)
     
-    
-    fill_atributes(chla_NN_var,long_name = 'Neural Network estimate of the logarithm of the concentration of Chlorophyll', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(chla_NN),valid_min = np.nanmin(chla_NN[chla_NN>-990]))
-    fill_atributes(nap_NN_var,long_name = 'Neural Network estimate of the logarithm of the concentration of Non Algal Particles', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(nap_NN),valid_min = np.nanmin(nap_NN[nap_NN>-990]))
-    fill_atributes(cdom_NN_var,long_name = 'Neural Network estimate of the logarithm of the concentration of Colored Dissolved Organic Matter', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(cdom_NN),valid_min = np.nanmin(cdom_NN[cdom_NN>-990]))
-    
-    fill_atributes(chla_var,long_name = 'Bayesian estimate of the logarithm of the concentration of Chlorophyll', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(chla),valid_min = np.nanmin(chla[chla>-990]))
-    fill_atributes(nap_var,long_name = 'Bayesian estimate of the logarithm of the concentration of Non Algal Particles', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(nap),valid_min = np.nanmin(nap[nap>-990]))
-    fill_atributes(cdom_var,long_name = 'Bayesian estimate of the logarithm of the concentration of Colored Dissolved Organic Matter', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(cdom),valid_min = np.nanmin(cdom[cdom>-990]))
-    fill_atributes(dchla_var,long_name = 'Uncertainty for the bayesian estimate of the logarithm of the concentration of Chlorophyll', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(dchla),valid_min = np.nanmin(dchla[dchla>-990]))
-    fill_atributes(dnap_var,long_name = 'Uncertainty for the bayesian  estimate of the logarithm of the concentration of Non Algal Particles', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(dnap),valid_min = np.nanmin(dnap[dnap>-990]))
-    fill_atributes(dcdom_var,long_name = 'Uncertainty for the bayesian  estimate of the logarithm of the concentration of Colored Dissolved Organic Matter', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(dcdom),valid_min = np.nanmin(dcdom[dcdom>-990]))
-
-    fill_atributes(kd_var,long_name = 'Bayesian derivation of downward light attenuation coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(kd),valid_min = np.nanmin(kd[kd>-990]))
-    fill_atributes(dkd_var,long_name = 'Uncertainty for the bayesian downward light attenuation coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(dkd),valid_min = np.nanmin(dkd[dkd>-990]))
-    fill_atributes(bbp_var,long_name = 'Bayesian derivation of particulate backward scattering coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(bbp),valid_min = np.nanmin(bbp[bbp>-990]))
-    fill_atributes(dbbp_var,long_name = 'Uncertainty for the particulate backward scattering coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(dbbp),valid_min = np.nanmin(dbbp[dbbp>-990]))
-    fill_atributes(RRS_var,long_name = 'Forward computation of the Remote Sensing Reflectance', axis=False,units='-',valid_max = np.nanmax(RRS),valid_min = np.nanmin(RRS[RRS>-990]))
+    if calc_NN:
+        fill_atributes(chla_NN_var,long_name = 'Neural Network estimate of the logarithm of the concentration of Chlorophyll', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(chla_NN),valid_min = np.nanmin(chla_NN[chla_NN>-990]))
+        fill_atributes(nap_NN_var,long_name = 'Neural Network estimate of the logarithm of the concentration of Non Algal Particles', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(nap_NN),valid_min = np.nanmin(nap_NN[nap_NN>-990]))
+        fill_atributes(cdom_NN_var,long_name = 'Neural Network estimate of the logarithm of the concentration of Colored Dissolved Organic Matter', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(cdom_NN),valid_min = np.nanmin(cdom_NN[cdom_NN>-990]))
+    if calc_chla:
+        fill_atributes(chla_var,long_name = 'Bayesian estimate of the logarithm of the concentration of Chlorophyll', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(chla),valid_min = np.nanmin(chla[chla>-990]))
+        fill_atributes(nap_var,long_name = 'Bayesian estimate of the logarithm of the concentration of Non Algal Particles', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(nap),valid_min = np.nanmin(nap[nap>-990]))
+        fill_atributes(cdom_var,long_name = 'Bayesian estimate of the logarithm of the concentration of Colored Dissolved Organic Matter', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(cdom),valid_min = np.nanmin(cdom[cdom>-990]))
+        fill_atributes(dchla_var,long_name = 'Uncertainty for the bayesian estimate of the logarithm of the concentration of Chlorophyll', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(dchla),valid_min = np.nanmin(dchla[dchla>-990]))
+        fill_atributes(dnap_var,long_name = 'Uncertainty for the bayesian  estimate of the logarithm of the concentration of Non Algal Particles', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(dnap),valid_min = np.nanmin(dnap[dnap>-990]))
+        fill_atributes(dcdom_var,long_name = 'Uncertainty for the bayesian  estimate of the logarithm of the concentration of Colored Dissolved Organic Matter', axis=False,units='log [mg m^(-3)]',valid_max = np.nanmax(dcdom),valid_min = np.nanmin(dcdom[dcdom>-990]))
+    if calc_kd:
+        fill_atributes(kd_var,long_name = 'Bayesian derivation of downward light attenuation coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(kd),valid_min = np.nanmin(kd[kd>-990]))
+        fill_atributes(dkd_var,long_name = 'Uncertainty for the bayesian downward light attenuation coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(dkd),valid_min = np.nanmin(dkd[dkd>-990]))
+    if calc_bbp:
+        fill_atributes(bbp_var,long_name = 'Bayesian derivation of particulate backward scattering coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(bbp),valid_min = np.nanmin(bbp[bbp>-990]))
+        fill_atributes(dbbp_var,long_name = 'Uncertainty for the particulate backward scattering coefficient', axis=False,units='m^(-1)',valid_max = np.nanmax(dbbp),valid_min = np.nanmin(dbbp[dbbp>-990]))
+    if calc_rrs: fill_atributes(RRS_var,long_name = 'Forward computation of the Remote Sensing Reflectance', axis=False,units='-',valid_max = np.nanmax(RRS),valid_min = np.nanmin(RRS[RRS>-990]))
                    
     time_var[:] = (datetime(year=2020,month=1,day=1) - datetime(year=1981,month=1,day=1)).days
     lat_var[:] = lat
     lon_var[:] = lon
     lambda_var[:] = np.array([412.5,442.5,490.0,510.0,555.0])
 
-    chla_NN_var[0,:,:] = chla_NN
-    nap_NN_var[0,:,:] = nap_NN
-    cdom_NN_var[0,:,:] = cdom_NN
-    chla_var[0,:,:] = chla
-    dchla_var[0,:,:] = dchla
-    nap_var[0,:,:] = nap
-    dnap_var[0,:,:] = dnap
-    cdom_var[0,:,:] = cdom
-    dcdom_var[0,:,:] = dcdom
+    if calc_NN:
+        chla_NN_var[0,:,:] = chla_NN
+        nap_NN_var[0,:,:] = nap_NN
+        cdom_NN_var[0,:,:] = cdom_NN
+        del chla_NN
+        del nap_NN
+        del cdom_NN
+        
+    if calc_chla:
+        chla_var[0,:,:] = chla
+        dchla_var[0,:,:] = dchla
+        nap_var[0,:,:] = nap
+        dnap_var[0,:,:] = dnap
+        cdom_var[0,:,:] = cdom
+        dcdom_var[0,:,:] = dcdom        
+        del chla
+        del dchla
+        del nap
+        del dnap
+        del cdom
+        del dcdom
 
-    kd_var[0,:,:,:] = kd
-    dkd_var[0,:,:,:] = dkd
-    bbp_var[0,:,:,:] = bbp
-    dbbp_var[0,:,:,:] = dbbp
-    RRS_var[0,:,:,:] = RRS
-
-    del chla_NN
-    del nap_NN
-    del cdom_NN
-    del chla
-    del dchla
-    del nap
-    del dnap
-    del cdom
-    del dcdom
-    del kd
-    del dkd
-    del bbp
-    del dbbp
-    del RRS
+    if calc_kd:
+        kd_var[0,:,:,:] = kd
+        dkd_var[0,:,:,:] = dkd
+        del kd
+        del dkd
+        
+    if calc_bbp:
+        bbp_var[0,:,:,:] = bbp
+        dbbp_var[0,:,:,:] = dbbp
+        del bbp
+        del dbbp
+        
+    if calc_rrs:
+        RRS_var[0,:,:,:] = RRS
+        del RRS
+        
     del lat
     del lon
     
@@ -747,7 +945,6 @@ def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101'
     
 if __name__ == '__main__':
 
-    
     
     conf_ = read_parameters()
     comm,rank,nranks = set_mpi('127.0.0.1','29500',1)
@@ -760,13 +957,33 @@ if __name__ == '__main__':
     my_device = conf_['device']
     constant = read_constants(file1=conf_['constants_path']+'/cte_lambda.csv',file2=conf_['constants_path']+'/cte.csv',my_device = my_device)
     date_str = conf_['date']
-    
 
-    dataset = inversion(dateformat=conf_['dateformat'],scratch_path=conf_['scratch_path'],oasim_data_path=conf_['oasim_data_path'],rrs_data_path=conf_['rrs_data_path'],PAR_path=conf_['PAR_path'],zenith_path=conf_['zenith_path'],date_str=conf_['date'],rank=rank,nranks=nranks,comm=comm,my_device=my_device)    
+    ##
+    date_str = '20080605'
+    conf_['rrs_data_path'] = rrs_data_file = '/g100_scratch/userexternal/csotolop/DIIM_output/RRS/20080605_cmems_obs-oc_med_bgc-reflectance_my_l3-multi-1km_P1D.nc'
+    conf_['oasim_data_path'] = oasim_data_path = '/g100_scratch/userexternal/csotolop/DIIM_output/OASIM_maps/oasim_map_20080605.nc'
+    conf_['dateformat'] = '%Y%m%d'
+    conf_['date'] = date_str
+    date = datetime.strptime(date_str,conf_['dateformat'])
+    time_utc = datetime(year = date.year,month = date.month,day=date.day,hour=11)
+    output_data_path = conf_['output_path'] = '/g100_scratch/userexternal/csotolop/DIIM_output/diim_maps'+ '/diim_map_' + date_str + '.nc'
+    ##
+
+    dataset = inversion(dateformat=conf_['dateformat'],scratch_path=conf_['scratch_path'],oasim_data_path=conf_['oasim_data_path'],rrs_data_path=conf_['rrs_data_path'],PAR_path=conf_['PAR_path'],zenith_path=conf_['zenith_path'],date_str=conf_['date'],rank=rank,nranks=nranks,comm=comm,my_device=my_device,perturbation_factors = perturbation_factors,constant=constant)
+
+
+    
+    ##
+    #if rank == 0 :
+    #    dataset = read_map_class(oasim_data_file=oasim_data_path,\
+    #                             rrs_data_file=rrs_data_file,time_utc = time_utc,scratch_path = conf_['scratch_path'] ,\
+    #                             PAR_folder = conf_['PAR_path'],zenith_folder = conf_['zenith_path'],store_data = True,dateformat = conf_['dateformat'])
+    ##
     
     if rank == 0:
         create_map(conf_['scratch_path'],dataset,output_path = conf_['output_path'],date_str = conf_['date'])
 
+    
 
     
 

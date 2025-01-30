@@ -8,7 +8,7 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    if len(sys.argv)==2:
+    if len(sys.argv)>=2:
         frack_files = int(sys.argv[1])
     else:
         frack_files = 1
@@ -17,7 +17,6 @@ if __name__ == "__main__":
         select_files = int(sys.argv[2]) - 1
     else:
         select_files = 0
-    
     comm,rank,nranks = set_mpi('127.0.0.1','29500',1)
     
     scratch_path = '/g100_scratch/userexternal/csotolop/DIIM_output/diim_scratch'
@@ -41,12 +40,13 @@ if __name__ == "__main__":
     if frack_files == select_files + 1:
         end = len(rrs_files)
     else:
-        end = int(len(rrs_files)/frack_files)*(select_files+1) 
+        end = int(len(rrs_files)/frack_files)*(select_files+1)
+    print(frack_files,select_files)
     rrs_files_ = rrs_files[init:end]
+
     if rank == 0:
+        print('creating {} maps'.format(len(rrs_files_)))
         import time
-        
-    rrs_files_ = [rrs_files[0]]
     
     for file_ in rrs_files_:
         
@@ -59,7 +59,8 @@ if __name__ == "__main__":
         rrs_data_path = rrs_path + '/' + date_str + '_cmems_obs-oc_med_bgc-reflectance_my_l3-multi-1km_P1D.nc'
         output_data_path = output_path + '/diim_map_' + date_str + '.nc'
 
-        dataset = inversion(dateformat=dateformat,scratch_path=scratch_path,oasim_data_path=oasim_data_path,rrs_data_path=rrs_data_path,PAR_path=PAR_path,zenith_path=zenith_path,date_str=date_str,rank=rank,nranks=nranks,comm=comm,my_device=my_device)    
+        if ~os.path.isfile(oasim_data_path): continue
+        dataset = inversion(dateformat=dateformat,scratch_path=scratch_path,oasim_data_path=oasim_data_path,rrs_data_path=rrs_data_path,PAR_path=PAR_path,zenith_path=zenith_path,date_str=date_str,rank=rank,nranks=nranks,comm=comm,my_device=my_device,perturbation_factors = perturbation_factors,constant = constant)    
     
         if rank == 0:
             create_map(scratch_path,dataset,output_path = output_data_path,date_str = date_str)

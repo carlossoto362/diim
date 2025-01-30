@@ -1,6 +1,17 @@
 from netCDF4 import Dataset
+
 import numpy as np
-import torch
+from torch import float32,ones,tensor,empty,eye,transpose,zeros,set_num_threads
+from torch import load as tload
+from torch import rand as trand
+from torch import argwhere as targwhere
+from torch import isnan as tisnan
+from torch import inverse as tinverse
+from torch import transpose as ttranspose
+from torch import sqrt as tsqrt
+from torch import diagonal as tdiagonal
+from torch.autograd.functional import jacobian as tjacobian
+from torch.optim import Adam, lr_scheduler
 from torch.utils.data import DataLoader
 import time
 import sys
@@ -126,7 +137,7 @@ def PAR_calculator(wl,Edir,Edif,time_utc,folder = '.',dateformat = '%Y%m%d-%H:%M
 class read_map_class():
     def __init__(self,oasim_data_file = '/path/where/to/read/oasim/data',rrs_data_file='/path/where/to/read/rrs/data',\
                  time_utc = datetime(year=2020,month=3,day=1),PAR_folder = '/path/where/to/read/PAR',\
-                 zenith_folder = '/path/where/to/read/zenith/angle',my_precision = torch.float32,\
+                 zenith_folder = '/path/where/to/read/zenith/angle',my_precision = float32,\
                  scratch_path = '/path/to/scratch/',store_data = False,dateformat = '%Y%m%d %H:%M:%S'):
         
         init_time = time.time()
@@ -183,11 +194,11 @@ class read_map_class():
             x_data[:,8] = linear_splines(510,wl,Edir).reshape((n_points))
             x_data[:,9] = linear_splines(555,wl,Edir).reshape((n_points))
             
-            x_data[:,10] = torch.ones((n_points)) * 412.5
-            x_data[:,11] = torch.ones((n_points)) * 442.5
-            x_data[:,12] = torch.ones((n_points)) * 490
-            x_data[:,13] = torch.ones((n_points)) * 510
-            x_data[:,14] = torch.ones((n_points)) * 555
+            x_data[:,10] = ones((n_points)) * 412.5
+            x_data[:,11] = ones((n_points)) * 442.5
+            x_data[:,12] = ones((n_points)) * 490
+            x_data[:,13] = ones((n_points)) * 510
+            x_data[:,14] = ones((n_points)) * 555
             general_parameters['time'] = [time_utc]
             general_parameters['time_format'] = [dateformat]
             x_data[:,15] = get_solar_position(time_utc,mesh_lat,mesh_lon,folder = zenith_folder,dateformat = dateformat).reshape((n_points))
@@ -221,8 +232,8 @@ class read_map_class():
             
             y_data[y_data < -900.] = np.nan
             x_data[x_data < -900.] = np.nan
-            self.x_data = torch.tensor(x_data[non_nan_points]).to(my_precision)
-            self.y_data = torch.tensor(y_data[non_nan_points]).to(my_precision)
+            self.x_data = tensor(x_data[non_nan_points]).to(my_precision)
+            self.y_data = tensor(y_data[non_nan_points]).to(my_precision)
             self.non_nan_points = non_nan_points
             read_general_parameters(self,scratch_path + '/general_parameters_'+self.date_str+'.csv')
             
@@ -233,9 +244,9 @@ class read_map_class():
             x_data = np.load(self.input_data_path + '/x_data_'+self.date_str+'.npy')
             y_data[y_data < -900.] = np.nan
             x_data[x_data < -900.] = np.nan
-            self.x_data = torch.tensor(x_data).to(my_precision)
-            self.y_data = torch.tensor(y_data).to(my_precision)
-            self.non_nan_points = torch.tensor(np.load(self.non_nan_points_path))
+            self.x_data = tensor(x_data).to(my_precision)
+            self.y_data = tensor(y_data).to(my_precision)
+            self.non_nan_points = tensor(np.load(self.non_nan_points_path))
             
         else:
             print(scratch_path + "/general_parameters_"+self.date_str+".csv dosn't exist,")
@@ -249,7 +260,7 @@ class read_map_class():
 
     
     def __getitem__(self, idx):
-        image = torch.empty((5,5))
+        image = empty((5,5))
         image[:,0] = self.x_data[idx][:5]
         image[:,1] = self.x_data[idx][5:10]
         image[:,2] = self.x_data[idx][10:15]
@@ -267,18 +278,18 @@ class read_map_class():
 
     
 
-def local_initial_conditions_nn(F_model,constant,data,precision = torch.float32,my_device = 'cpu',rearange_needed=True):
+def local_initial_conditions_nn(F_model,constant,data,precision = float32,my_device = 'cpu',rearange_needed=True):
     
     init_time_ = time.time()
 
     model_NN = NN_second_layer(my_device=my_device,chla_centered=True ,precision = precision,constant=constant).to(my_device)
 
-    model_NN.load_state_dict(torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))
+    model_NN.load_state_dict(tload(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))
     model_NN.eval()
 
     if rearange_needed == True:
         X,Y = data
-        data_rearanged = torch.empty((X.shape[0],1,17))
+        data_rearanged = empty((X.shape[0],1,17))
         data_rearanged[:,0,:5] = Y
         data_rearanged[:,0,5:10] = X[:,0]
         data_rearanged[:,0,10:15] = X[:,1]
@@ -290,8 +301,8 @@ def local_initial_conditions_nn(F_model,constant,data,precision = torch.float32,
     z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model_NN(data_rearanged) #we are working with \lambda as imput, but the NN dosent use it.
     mu_z = (mu_z* model_NN.y_mul[0] + model_NN.y_add[0]).clone().detach()
 
-    if torch.isnan(mu_z).any():
-        mu_z[torch.argwhere(torch.isnan(mu_z))] = torch.rand(mu_z[torch.argwhere(torch.isnan(mu_z))].shape,dtype=torch.float32)
+    if tisnan(mu_z).any():
+        mu_z[targwhere(tisnan(mu_z))] = trand(mu_z[targwhere(tisnan(mu_z))].shape,dtype=float32)
 
     state_dict = F_model.state_dict()
     state_dict['chparam']  = mu_z.unsqueeze(1)
@@ -300,7 +311,7 @@ def local_initial_conditions_nn(F_model,constant,data,precision = torch.float32,
     return mu_z
 
 def get_jacobian_components(original_jacobian,len_: int,comp: int):
-    new_jacobian = torch.empty((len_,5,3))
+    new_jacobian = empty((len_,comp,3))
     map(lambda i: new_jacobian[i].append(original_jacobian[i,:,i,:,:].reshape(comp,3)),range(len_))
     return new_jacobian
 
@@ -346,12 +357,12 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
 
       Scheduler: Defines if use a scheduler in the Adam Algorithm, it can accelerate the convergence of the algorithm. 
     """
-    past_pred=torch.empty((N,num_days,3))
+    past_pred=empty((N,num_days,3))
 
     criterium = 1
     criterium_2 = 0
     i=0
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
     X = data_i[0]
     Y = data_i[1]
@@ -367,8 +378,8 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
         
         pred = model(X,constant = constant,perturbation_factors_ = perturbation_factors_)
         
-        if torch.isnan(pred).any():
-            where_nan = torch.argwhere(torch.isnan(pred))[0]
+        if tisnan(pred).any():
+            where_nan = targwhere(tisnan(pred))[0]
             if where_nan[0] == 0:
                 pred[where_nan] = (pred[where_nan[0]+1,where_nan[1]].clone())
             elif where_nan[0] == len(pred[0]):
@@ -392,7 +403,7 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
         scheduler.step(loss)
         
     last_rrs = pred.clone().detach()
-    
+    last_i = i
     print('one loop',time.time() - init_time)
     init_time = time.time()
     
@@ -400,41 +411,43 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
     evaluate_model = evaluate_model_class(model=model,X=X,constant = constant)
     
 
-    K_x_ = torch.autograd.functional.jacobian(evaluate_model.model_der,inputs=(parameters_eval))
-    K_x = get_jacobian_components(k_x_,len(parameters_eval),5)
+    K_x_ = tjacobian(evaluate_model.model_der,inputs=(parameters_eval))
+    K_x = get_jacobian_components(K_x_,len(parameters_eval),5)
     del K_x_
         
-    S_hat = torch.inverse( torch.transpose(K_x,1,2) @ ( s_e_inverse @ K_x ) + s_a_inverse  )
+    S_hat = tinverse( ttranspose(K_x,1,2) @ ( s_e_inverse @ K_x ) + s_a_inverse  )
         
     X_hat = np.empty((len(parameters_eval),6))
     X_hat[:,::2] = past_pred[last_i-1].clone().detach()
-    X_hat[:,1::2] = torch.sqrt(torch.diagonal(S_hat,dim1=1,dim2=2).clone().detach())
+    X_hat[:,1::2] = tsqrt(tdiagonal(S_hat,dim1=1,dim2=2).clone().detach())
     output = {'X_hat':X_hat,'RRS_hat':last_rrs}
     print('uncertainty computation',time.time() - init_time)
     if calc_kd:
         init_time = time.time()
-    
-        kd_hat = torch.empty((len(parameters_eval),10))
-        kd_derivative_ = torch.autograd.functional.jacobian(evaluate_model.kd_der,inputs=(parameters_eval))
+
+        kd_values = evaluate_model.kd_der(parameters_eval)
+        kd_hat = empty((len(parameters_eval),10))
+        kd_derivative_ = tjacobian(evaluate_model.kd_der,inputs=(parameters_eval))
         kd_derivative = get_jacobian_components(kd_derivative_,len(parameters_eval),5)
         del kd_derivative_
-               
+
         kd_delta = error_propagation(kd_derivative,S_hat)
         kd_hat[:,::2] = kd_values.clone().detach()
-        kd_hat[:,1::2] = torch.sqrt(kd_delta).clone().detach()
+        kd_hat[:,1::2] = tsqrt(kd_delta).clone().detach()
         output['kd_hat'] = kd_hat
     if calc_bbp:
 
-        bbp_hat = torch.empty((len(parameters_eval),6))
+        bbp_values = evaluate_model.bbp_der(parameters_eval)
+        bbp_hat = empty((len(parameters_eval),6))
         bbp_values = evaluate_model.bbp_der(parameters_eval)
     
-        bbp_derivative_ = torch.autograd.functional.jacobian(evaluate_model.bbp_der,inputs=(parameters_eval))
+        bbp_derivative_ = tjacobian(evaluate_model.bbp_der,inputs=(parameters_eval))
         bbp_derivative = get_jacobian_components(bbp_derivative_,len(parameters_eval),3)
         del bbp_derivative_
         
         bbp_delta = error_propagation(bbp_derivative,S_hat)
         bbp_hat[:,::2] = bbp_values.clone().detach()
-        bbp_hat[:,1::2] = torch.sqrt(bbp_delta).clone().detach()
+        bbp_hat[:,1::2] = tsqrt(bbp_delta).clone().detach()
         output['bbp_hat'] = bbp_hat
     
     print('kd and bbp',time.time() - init_time)
@@ -556,10 +569,10 @@ def set_mpi(master_addr,master_port,num_threads):
     #in case the code try to be run in GPU, lets specify master as local host. 
     os.environ['MASTER_ADDR'] = master_addr
     os.environ['MASTER_PORT'] = master_port
-    torch.set_num_threads(num_threads)
+    set_num_threads(num_threads)
     return comm,rank,nranks
 
-def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',oasim_data_path=HOME_PATH + '/map/oasim_map/maps/OASIM_MED.nc',rrs_data_path=HOME_PATH + '/map/RRS/RRS_MED.nc',PAR_path=HOME_PATH + '/map/PAR',zenith_path=HOME_PATH + '/map/zenith',date_str='20000101-00:00:00',rank=0,nranks=1,comm=None,my_device='cpu',perturbation_factors=torch.ones(14, dtype=torch.float32),constant=None,calc_kd=True,calc_bbp=True):
+def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',oasim_data_path=HOME_PATH + '/map/oasim_map/maps/OASIM_MED.nc',rrs_data_path=HOME_PATH + '/map/RRS/RRS_MED.nc',PAR_path=HOME_PATH + '/map/PAR',zenith_path=HOME_PATH + '/map/zenith',date_str='20000101-00:00:00',rank=0,nranks=1,comm=None,my_device='cpu',perturbation_factors=ones(14, dtype=float32),constant=None,calc_kd=True,calc_bbp=True):
     
     """
     Inversts the rrs, and store the outputs in scratch_path. These outputs are intented to be used to create a netcdf with an independent function, later. Use in combination of mpi4py, comm is used to place barriers. 
@@ -601,7 +614,7 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
     if rank == 0 :
         dataset = read_map_class(oasim_data_file=oasim_data_path,\
                                  rrs_data_file=rrs_data_path,time_utc = time_utc,scratch_path = scratch_path ,\
-                                 PAR_folder = PAR_path,zenith_folder = zenith_path,store_data = True,dateformat = dateformat)
+                                 PAR_folder = PAR_path,zenith_folder = zenith_path,store_data = False,dateformat = dateformat)
     comm.Barrier()
 
     
@@ -611,11 +624,11 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
                                  PAR_folder = PAR_path,zenith_folder = zenith_path,store_data = False,dateformat = dateformat)
             
     lr = 0.029853826189179603
-    x_a = torch.zeros(3)
-    s_a = torch.eye(3) * 4.9
-    s_e = (torch.eye(5)*torch.tensor([1.5e-3,1.2e-3,1e-3,8.6e-4,5.7e-4]))**(2)#validation rmse from https://catalogue.marine.copernicus.eu/documents/QUID/CMEMS-OC-QUID-009-141to144-151to154.pdf
+    x_a = zeros(3)
+    s_a = eye(3) * 4.9
+    s_e = (eye(5)*tensor([1.5e-3,1.2e-3,1e-3,8.6e-4,5.7e-4]))**(2)#validation rmse from https://catalogue.marine.copernicus.eu/documents/QUID/CMEMS-OC-QUID-009-141to144-151to154.pdf
 
-    batch_size = 100#len(dataset)
+    batch_size = 10#len(dataset)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     if rank == 0:
@@ -647,17 +660,17 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
             
             model = Forward_Model(num_days=len_batch).to(my_device)
             model.perturbation_factors = perturbation_factors
-            chla_NN_sen = local_initial_conditions_nn(model,constant,data,precision = torch.float32,my_device = 'cpu').numpy()
+            chla_NN_sen = local_initial_conditions_nn(model,constant,data,precision = float32,my_device = 'cpu').numpy()
             loss = RRS_loss(x_a,s_a,s_e,num_days=len_batch,my_device = my_device)
-            optimizer = torch.optim.Adam(model.parameters(),lr=lr)
+            optimizer = Adam(model.parameters(),lr=lr)
             output = train_loop(data,model,loss,optimizer,4000,kind='all',\
-                                      num_days=len_batch,constant = constant,perturbation_factors_ = perturbation_factors, scheduler = True)
+                                      num_days=len_batch,constant = constant,perturbation_factors_ = perturbation_factors)
 
             if np.isnan(output['X_hat']).all():
                 model = Forward_Model(num_days=len_batch).to(my_device)
                 model.perturbation_factors = perturbation_factors
                 loss = RRS_loss(x_a,s_a,s_e,num_days=len_batch,my_device = my_device)
-                optimizer = torch.optim.Adam(model.parameters(),lr=lr)
+                optimizer = Adam(model.parameters(),lr=lr)
                 output = train_loop(data,model,loss,optimizer,4000,kind='all',\
                                       num_days=len_batch,constant = constant,perturbation_factors_ = perturbation_factors,calc_kd = calc_kd, calc_bbp = calc_bbp)
                 if np.isnan(output['X_hat']).all():
@@ -945,7 +958,7 @@ def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101'
     
 if __name__ == '__main__':
 
-    
+    print('modules loaded')
     conf_ = read_parameters()
     comm,rank,nranks = set_mpi('127.0.0.1','29500',1)
     
@@ -953,7 +966,7 @@ if __name__ == '__main__':
     #Im using mpi to compute multiple points at the same time, each with different cores. 
     #each core knows where the data is and the hyperparameter values. 
     scratch_path = conf_['scratch_path']
-    perturbation_factors = torch.tensor(np.load(conf_['perturbation_factors_path']))[-100:].mean(axis=0).to(torch.float32)
+    perturbation_factors = tensor(np.load(conf_['perturbation_factors_path']))[-100:].mean(axis=0).to(float32)
     my_device = conf_['device']
     constant = read_constants(file1=conf_['constants_path']+'/cte_lambda.csv',file2=conf_['constants_path']+'/cte.csv',my_device = my_device)
     date_str = conf_['date']

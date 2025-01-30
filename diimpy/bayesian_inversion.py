@@ -87,7 +87,8 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
     dR = (1e-13)
 
     while (((criterium >dR ) & (i<N)) or ((criterium_2 < 100)&(i<N))):
-        pred = model(X,constant = constant,perturbation_factors_ = perturbation_factors_)
+        
+        pred = model(X,constant = constant,perturbation_factors_ = perturbation_factors_)                
         loss = loss_fn(Y,pred,model.state_dict()['chparam'])
         loss.backward()
         optimizer.step()

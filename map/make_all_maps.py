@@ -5,6 +5,7 @@ import torch
 import os
 import sys
 import numpy as np
+from datetime import datetime,timedelta
 
 if __name__ == "__main__":
 
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     zenith_path = '/g100_scratch/userexternal/csotolop/DIIM_output/zenith'
     output_path = '/g100_scratch/userexternal/csotolop/DIIM_output/diim_maps'
     
-    perturbation_factors = torch.tensor(np.load(perturbation_factors_path))[-100:].mean(axis=0).to(torch.float32)
+    perturbation_factors = torch.tensor(np.load(perturbation_factors_path))[-1].to(torch.float32)
     my_device = 'cpu'
     constant = read_constants(file1=constants_path+'/cte_lambda.csv',file2=constants_path+'/cte.csv',my_device = my_device)
     
@@ -41,9 +42,9 @@ if __name__ == "__main__":
         end = len(rrs_files)
     else:
         end = int(len(rrs_files)/frack_files)*(select_files+1)
-    print(frack_files,select_files)
-    rrs_files_ = rrs_files[init:end]
 
+    rrs_files_ = rrs_files[init:end]
+    
     if rank == 0:
         print('creating {} maps'.format(len(rrs_files_)))
         import time
@@ -59,10 +60,16 @@ if __name__ == "__main__":
         rrs_data_path = rrs_path + '/' + date_str + '_cmems_obs-oc_med_bgc-reflectance_my_l3-multi-1km_P1D.nc'
         output_data_path = output_path + '/diim_map_' + date_str + '.nc'
 
-        if ~os.path.isfile(oasim_data_path): continue
-        dataset = inversion(dateformat=dateformat,scratch_path=scratch_path,oasim_data_path=oasim_data_path,rrs_data_path=rrs_data_path,PAR_path=PAR_path,zenith_path=zenith_path,date_str=date_str,rank=rank,nranks=nranks,comm=comm,my_device=my_device,perturbation_factors = perturbation_factors,constant = constant)    
+        date = datetime.strptime(date_str,dateformat)
+        
+        oasim_data_paths = [oasim_data_path.split(date_str)[0] + (date + timedelta(days=i)).strftime(dateformat) + oasim_data_path.split(date_str)[1] for i in [-2,-1,0,1,2]]
+
+        if ~np.array([ os.path.isfile(path_) for path_ in oasim_data_paths]).all(): continue
+
+            
+        dataset = inversion(dateformat=dateformat,scratch_path=scratch_path,oasim_data_path=oasim_data_paths,rrs_data_path=rrs_data_path,PAR_path=PAR_path,zenith_path=zenith_path,date_str=date_str,rank=rank,nranks=nranks,comm=comm,my_device=my_device,perturbation_factors = perturbation_factors,constant = constant)    
     
         if rank == 0:
             create_map(scratch_path,dataset,output_path = output_data_path,date_str = date_str)
-            print(output_data_path + 'created in {} seconds.'.format(time.time() - time_init))
+            print(output_data_path + ' created in {} seconds.'.format(time.time() - time_init))
 

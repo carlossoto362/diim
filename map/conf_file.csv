@@ -1,5 +1,5 @@
 scratch_path /g100_scratch/userexternal/csotolop/DIIM_output/diim_scratch
-perturbation_factors_path /g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy
+perturbation_factors_path /g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered_final.npy
 device cpu
 constants_path /g100_work/OGS23_PRACE_IT/csoto/DIIM/settings
 oasim_data_path /g100_scratch/userexternal/csotolop/DIIM_output/OASIM_maps/oasim_map_20201029.nc

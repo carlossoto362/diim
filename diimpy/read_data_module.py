@@ -441,7 +441,8 @@ if __name__ == '__main__':
     
     data_path = HOME_PATH + '/settings/npy_data'
     data = customTensorData(data_path=data_path,which='all',per_day = True,randomice=True,seed=1853)
-    print(data.x_data[:,5].mean(),data.x_data[:,5].max(),data.x_data[:,5].min())
+    print(np.max(data.x_data,axis=0))
+    #print(data.x_column_names)
 
 
 

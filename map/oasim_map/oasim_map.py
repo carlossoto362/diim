@@ -466,7 +466,8 @@ def getting_oasim_output(dateformat='%Y%m%d-%H:%M:%S',\
     sp,msl,u10,v10,ws10,tco3,t2m,d2m,tcc,tclw,cdrem = [init_map() for _ in range(11)]
     #carefull,output and input of cunit.monrad will be np.array.shape = (npoints,nwavelenghts)
     taua,asymp,ssalb,edout,esout = [init_map(w=True) for _ in range(5)]
-    
+    print(len(OUT_Timelist))
+    sys.exit()
     for it,tt in enumerate(OUT_Timelist[:]):
 
         ############################################ ATMOSPHERE #############################################

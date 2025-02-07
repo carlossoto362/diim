@@ -6,7 +6,6 @@ import math
 import numpy as np
 import torch
 from torch import nn
-from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 from datetime import datetime, timedelta
 import pandas as pd

@@ -1,11 +1,11 @@
 from netCDF4 import Dataset
-
 import numpy as np
 from torch import float32,ones,tensor,empty,eye,transpose,zeros,set_num_threads
 from torch import load as tload
 from torch import rand as trand
 from torch import argwhere as targwhere
 from torch import isnan as tisnan
+from torch import cat as tcat
 from torch import inverse as tinverse
 from torch import transpose as ttranspose
 from torch import sqrt as tsqrt
@@ -82,7 +82,7 @@ def zenith_angle(sun_declination_,hour_angle,lats):
     """
     return the sun zenith angle as a function of the sun declination, the hour angle, and the latitude. 
     """
-    return np.arccos(
+    return (180/np.pi)*np.arccos(
         np.sin(lats*np.pi/180)*np.sin(sun_declination_) + np.cos(lats*np.pi/180)*np.cos(sun_declination_)*np.cos(hour_angle))
 
 def get_solar_position(time_utc,lats,lons,folder='./',dateformat='%Y%m%d-%H:%M:%S'):
@@ -106,12 +106,12 @@ def get_solar_position(time_utc,lats,lons,folder='./',dateformat='%Y%m%d-%H:%M:%
 
 
 @njit
-def integrate_par(Edif,Edir,wl,irange,ilen,constant):
+def integrate_par(Edif,Edir,wl,irange,ilen,constant_):
     PAR_ = np.zeros((Edir.shape[1:]))
     for i in range(ilen):
         PAR_ += (Edif[irange][i] + Edir[irange][i])*wl[irange][i]*1e-9 # Edif are the bin irradiance, the integral Edif for a rectangle of size dlambda
 
-    PAR_ = PAR_  * constant
+    PAR_ = PAR_  * constant_*(10/24) #10/24 is because i used edir average over 10 hours, but i want the daily average, approximating Edif and edif of the remaining hours equal to zero. 
     return PAR_
     
 def PAR_calculator(wl,Edir,Edif,time_utc,folder = '.',dateformat = '%Y%m%d-%H:%M:%S'):
@@ -123,12 +123,12 @@ def PAR_calculator(wl,Edir,Edif,time_utc,folder = '.',dateformat = '%Y%m%d-%H:%M
     time_init = time.time()
     Na = 6.0221408e+23
     h = 6.62607015e-34
-    c = 299792458 
-    constant = (10**6)/ (Na*h*c)
+    c = 299792458
+    constant_ = (10**6)/ (Na*h*c)
     irange = ((wl>401) & (wl<699))
     ilen = len(wl[irange])
 
-    PAR_ = integrate_par(Edif,Edir,wl,irange,ilen,constant)
+    PAR_ = integrate_par(Edif,Edir,wl,irange,ilen,constant_)
     
     np.save(folder + '/PAR_'+datetime.strftime(time_utc + timedelta(hours=1),dateformat ) + '.npy',PAR_)
     #print('PAR computed in time:',time.time() - time_init)
@@ -139,8 +139,8 @@ class read_map_class():
                  time_utc = datetime(year=2020,month=3,day=1),PAR_folder = '/path/where/to/read/PAR',\
                  zenith_folder = '/path/where/to/read/zenith/angle',my_precision = float32,\
                  scratch_path = '/path/to/scratch/',store_data = False,dateformat = '%Y%m%d %H:%M:%S'):
+
         
-        init_time = time.time()
         self.my_precision = my_precision
         self.date_str = datetime.strftime(time_utc + timedelta(hours=1),dateformat ) 
 
@@ -160,18 +160,32 @@ class read_map_class():
         if store_data == True:
             general_parameters = pd.DataFrame()
             
-            OASIM_data = Dataset(oasim_data_file)
+            flag = 0
+            
+            for oasim_ in oasim_data_file:
+                OASIM_data = Dataset(oasim_)
+                if flag == 0:
+                    general_parameters['len_lat']  = [len(OASIM_data['lat'][:])]
+                    general_parameters['len_lon']  = [len(OASIM_data['lon'][:])]
+                    general_parameters['n_points']  = [len(OASIM_data['lat'][:])*len(OASIM_data['lon'][:])]
+                    mesh_lat,mesh_lon = np.meshgrid(OASIM_data['lat'][:],OASIM_data['lon'][:])
+                    wl = OASIM_data['wavelength'][:].data
+                    Edif = np.zeros(OASIM_data['esout'][:].shape[1:])
+                    Edir = np.zeros(OASIM_data['esout'][:].shape[1:])
+                
+                flag += 1
+                
+                Edir += np.mean(OASIM_data['edout'][:,:,:,:], axis = 0)
+                Edif += np.mean(OASIM_data['esout'][:,:,:,:], axis = 0)
+                del OASIM_data
+                
+            Edir = np.ma.filled(Edir/len(oasim_data_file),fill_value=-999)
+            Edif = np.ma.filled(Edif/len(oasim_data_file),fill_value=-999)
+                
             RRS_data = Dataset(rrs_data_file)
             
-            wl = OASIM_data['wavelength'][:].data
-            
-            general_parameters['len_lat']  = [len(OASIM_data['lat'][:])]
-            general_parameters['len_lon']  = [len(OASIM_data['lon'][:])]
-            
-            general_parameters['n_points']  = [len(OASIM_data['lat'][:])*len(OASIM_data['lon'][:])]
             n_points = int(general_parameters['n_points'].iloc[0])
-            
-            mesh_lat,mesh_lon = np.meshgrid(OASIM_data['lat'][:],OASIM_data['lon'][:])
+
             mesh_lat, mesh_lon = mesh_lat.T.data, mesh_lon.T.data
             general_parameters['mesh_lat_path'] = [scratch_path + '/mesh_lat.npy']
             np.save(scratch_path + '/mesh_lat.npy',mesh_lat)
@@ -179,15 +193,12 @@ class read_map_class():
             np.save(scratch_path + '/mesh_lon.npy',mesh_lon)
         
             x_data = np.empty((n_points,17))
-            
-            Edif = np.ma.filled(np.mean(OASIM_data['esout'][:,:,:,:], axis = 0),fill_value=-999)
             x_data[:,0] = linear_splines(412.5,wl,Edif).reshape((n_points))
             x_data[:,1] = linear_splines(442.5,wl,Edif).reshape((n_points))
             x_data[:,2] = linear_splines(490,wl,Edif).reshape((n_points))
             x_data[:,3] = linear_splines(510,wl,Edif).reshape((n_points))
             x_data[:,4] = linear_splines(555,wl,Edif).reshape((n_points))
             
-            Edir = np.ma.filled(np.mean(OASIM_data['edout'][:,:,:,:], axis = 0),fill_value=-999)
             x_data[:,5] = linear_splines(412.5,wl,Edir).reshape((n_points))
             x_data[:,6] = linear_splines(442.5,wl,Edir).reshape((n_points))
             x_data[:,7] = linear_splines(490,wl,Edir).reshape((n_points))
@@ -199,6 +210,7 @@ class read_map_class():
             x_data[:,12] = ones((n_points)) * 490
             x_data[:,13] = ones((n_points)) * 510
             x_data[:,14] = ones((n_points)) * 555
+
             general_parameters['time'] = [time_utc]
             general_parameters['time_format'] = [dateformat]
             x_data[:,15] = get_solar_position(time_utc,mesh_lat,mesh_lon,folder = zenith_folder,dateformat = dateformat).reshape((n_points))
@@ -283,6 +295,7 @@ def local_initial_conditions_nn(F_model,constant,data,precision = float32,my_dev
     init_time_ = time.time()
 
     model_NN = NN_second_layer(my_device=my_device,chla_centered=True ,precision = precision,constant=constant).to(my_device)
+    state_dict_ = tload(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt')
 
     model_NN.load_state_dict(tload(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))
     model_NN.eval()
@@ -291,14 +304,15 @@ def local_initial_conditions_nn(F_model,constant,data,precision = float32,my_dev
         X,Y = data
         data_rearanged = empty((X.shape[0],1,17))
         data_rearanged[:,0,:5] = Y
-        data_rearanged[:,0,5:10] = X[:,0]
-        data_rearanged[:,0,10:15] = X[:,1]
-        data_rearanged[:,0,15] = X[:,3,0]
-        data_rearanged[:,0,16] = X[:,4,0]
+        data_rearanged[:,0,5:10] = X[:,:,0]
+        data_rearanged[:,0,10:15] = X[:,:,1]
+        data_rearanged[:,0,15] = X[:,0,3]
+        data_rearanged[:,0,16] = X[:,0,4]
     else:
         data_rearanged = data
         
-    z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model_NN(data_rearanged) #we are working with \lambda as imput, but the NN dosent use it.
+    X_ = (data_rearanged-model_NN.x_add)/model_NN.x_mul
+    z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model_NN(X_) #we are working with \lambda as imput, but the NN dosent use it.
     mu_z = (mu_z* model_NN.y_mul[0] + model_NN.y_add[0]).clone().detach()
 
     if tisnan(mu_z).any():
@@ -311,8 +325,9 @@ def local_initial_conditions_nn(F_model,constant,data,precision = float32,my_dev
     return mu_z
 
 def get_jacobian_components(original_jacobian,len_: int,comp: int):
-    new_jacobian = empty((len_,comp,3))
-    map(lambda i: new_jacobian[i].append(original_jacobian[i,:,i,:,:].reshape(comp,3)),range(len_))
+    new_jacobian = original_jacobian[0,:,0,:,:].reshape(comp,3).clone().unsqueeze(0)
+    for i in range(1,len_):
+        new_jacobian = tcat((new_jacobian,original_jacobian[i,:,i,:,:].reshape(comp,3).clone().unsqueeze(0)),0)
     return new_jacobian
 
 def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device = 'cpu',constant = None,perturbation_factors_ = None,calc_kd=True,calc_bbp=True):
@@ -357,6 +372,7 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
 
       Scheduler: Defines if use a scheduler in the Adam Algorithm, it can accelerate the convergence of the algorithm. 
     """
+    
     past_pred=empty((N,num_days,3))
 
     criterium = 1
@@ -404,29 +420,26 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
         
     last_rrs = pred.clone().detach()
     last_i = i
-    print('one loop',time.time() - init_time)
-    init_time = time.time()
     
     parameters_eval = list(model.parameters())[0].clone().detach()
     evaluate_model = evaluate_model_class(model=model,X=X,constant = constant)
     
-
     K_x_ = tjacobian(evaluate_model.model_der,inputs=(parameters_eval))
     K_x = get_jacobian_components(K_x_,len(parameters_eval),5)
     del K_x_
-        
+
     S_hat = tinverse( ttranspose(K_x,1,2) @ ( s_e_inverse @ K_x ) + s_a_inverse  )
-        
+    
     X_hat = np.empty((len(parameters_eval),6))
     X_hat[:,::2] = past_pred[last_i-1].clone().detach()
     X_hat[:,1::2] = tsqrt(tdiagonal(S_hat,dim1=1,dim2=2).clone().detach())
     output = {'X_hat':X_hat,'RRS_hat':last_rrs}
-    print('uncertainty computation',time.time() - init_time)
-    if calc_kd:
-        init_time = time.time()
 
-        kd_values = evaluate_model.kd_der(parameters_eval)
+    
+    if calc_kd:
+
         kd_hat = empty((len(parameters_eval),10))
+        kd_values = evaluate_model.kd_der(parameters_eval)
         kd_derivative_ = tjacobian(evaluate_model.kd_der,inputs=(parameters_eval))
         kd_derivative = get_jacobian_components(kd_derivative_,len(parameters_eval),5)
         del kd_derivative_
@@ -437,10 +450,8 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
         output['kd_hat'] = kd_hat
     if calc_bbp:
 
-        bbp_values = evaluate_model.bbp_der(parameters_eval)
         bbp_hat = empty((len(parameters_eval),6))
         bbp_values = evaluate_model.bbp_der(parameters_eval)
-    
         bbp_derivative_ = tjacobian(evaluate_model.bbp_der,inputs=(parameters_eval))
         bbp_derivative = get_jacobian_components(bbp_derivative_,len(parameters_eval),3)
         del bbp_derivative_
@@ -450,10 +461,6 @@ def train_loop(data_i,model,loss_fn,optimizer,N,kind='all',num_days=1,my_device 
         bbp_hat[:,1::2] = tsqrt(bbp_delta).clone().detach()
         output['bbp_hat'] = bbp_hat
     
-    print('kd and bbp',time.time() - init_time)
-    sys.exit()
-    
-    #print("time for training...",time.time() - time_init)
     return output
 
 
@@ -607,14 +614,13 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
         comm
             comm.Get_rank()
     """
-    
     date = datetime.strptime(date_str,dateformat)
     time_utc = datetime(year = date.year,month = date.month,day=date.day,hour=11)
 
     if rank == 0 :
         dataset = read_map_class(oasim_data_file=oasim_data_path,\
                                  rrs_data_file=rrs_data_path,time_utc = time_utc,scratch_path = scratch_path ,\
-                                 PAR_folder = PAR_path,zenith_folder = zenith_path,store_data = False,dateformat = dateformat)
+                                 PAR_folder = PAR_path,zenith_folder = zenith_path,store_data = True,dateformat = dateformat)
     comm.Barrier()
 
     
@@ -622,13 +628,12 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
         dataset = read_map_class(oasim_data_file=oasim_data_path,\
                                  rrs_data_file=rrs_data_path,time_utc = time_utc,scratch_path = scratch_path ,\
                                  PAR_folder = PAR_path,zenith_folder = zenith_path,store_data = False,dateformat = dateformat)
-            
     lr = 0.029853826189179603
     x_a = zeros(3)
     s_a = eye(3) * 4.9
     s_e = (eye(5)*tensor([1.5e-3,1.2e-3,1e-3,8.6e-4,5.7e-4]))**(2)#validation rmse from https://catalogue.marine.copernicus.eu/documents/QUID/CMEMS-OC-QUID-009-141to144-151to154.pdf
 
-    batch_size = 10#len(dataset)
+    batch_size = 1000#len(dataset)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     if rank == 0:
@@ -663,6 +668,7 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
             chla_NN_sen = local_initial_conditions_nn(model,constant,data,precision = float32,my_device = 'cpu').numpy()
             loss = RRS_loss(x_a,s_a,s_e,num_days=len_batch,my_device = my_device)
             optimizer = Adam(model.parameters(),lr=lr)
+            time_init = time.time()
             output = train_loop(data,model,loss,optimizer,4000,kind='all',\
                                       num_days=len_batch,constant = constant,perturbation_factors_ = perturbation_factors)
 
@@ -675,6 +681,7 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
                                       num_days=len_batch,constant = constant,perturbation_factors_ = perturbation_factors,calc_kd = calc_kd, calc_bbp = calc_bbp)
                 if np.isnan(output['X_hat']).all():
                     print(rank,i,'had a nan value for date, ',date_str)
+            #print('rank,i,values computed in {} seconds.'.format(time.time() - time_init))
             
             chla_log_sen = output['X_hat']
             RRS_log_sen = output['RRS_hat']
@@ -958,7 +965,6 @@ def create_map(scratch_path,dataset,output_path='./map.nc',date_str = '20000101'
     
 if __name__ == '__main__':
 
-    print('modules loaded')
     conf_ = read_parameters()
     comm,rank,nranks = set_mpi('127.0.0.1','29500',1)
     
@@ -966,23 +972,26 @@ if __name__ == '__main__':
     #Im using mpi to compute multiple points at the same time, each with different cores. 
     #each core knows where the data is and the hyperparameter values. 
     scratch_path = conf_['scratch_path']
-    perturbation_factors = tensor(np.load(conf_['perturbation_factors_path']))[-100:].mean(axis=0).to(float32)
+    perturbation_factors = tensor(np.load(conf_['perturbation_factors_path']))[-1].to(float32)
     my_device = conf_['device']
     constant = read_constants(file1=conf_['constants_path']+'/cte_lambda.csv',file2=conf_['constants_path']+'/cte.csv',my_device = my_device)
     date_str = conf_['date']
-
-    ##
-    date_str = '20080605'
-    conf_['rrs_data_path'] = rrs_data_file = '/g100_scratch/userexternal/csotolop/DIIM_output/RRS/20080605_cmems_obs-oc_med_bgc-reflectance_my_l3-multi-1km_P1D.nc'
-    conf_['oasim_data_path'] = oasim_data_path = '/g100_scratch/userexternal/csotolop/DIIM_output/OASIM_maps/oasim_map_20080605.nc'
-    conf_['dateformat'] = '%Y%m%d'
-    conf_['date'] = date_str
     date = datetime.strptime(date_str,conf_['dateformat'])
-    time_utc = datetime(year = date.year,month = date.month,day=date.day,hour=11)
-    output_data_path = conf_['output_path'] = '/g100_scratch/userexternal/csotolop/DIIM_output/diim_maps'+ '/diim_map_' + date_str + '.nc'
+
+    ##
+    #date_str = '20000406'
+    #dateformat = '%Y%m%d'
+    #conf_['rrs_data_path'] = rrs_data_file = '/g100_scratch/userexternal/csotolop/DIIM_output/RRS/'+date_str+'_cmems_obs-oc_med_bgc-reflectance_my_l3-multi-1km_P1D.nc'
+    #conf_['oasim_data_path'] = oasim_data_path = '/g100_scratch/userexternal/csotolop/DIIM_output/OASIM_maps/oasim_map_'+date_str+'.nc'
+    #conf_['dateformat'] = '%Y%m%d'
+    #conf_['date'] = date_str
+    #date = datetime.strptime(date_str,conf_['dateformat'])
+    #time_utc = datetime(year = date.year,month = date.month,day=date.day,hour=11)
+    #output_data_path = conf_['output_path'] = '/g100_scratch/userexternal/csotolop/DIIM_output/diim_maps'+ '/diim_map_' + date_str + '.nc'
     ##
 
-    dataset = inversion(dateformat=conf_['dateformat'],scratch_path=conf_['scratch_path'],oasim_data_path=conf_['oasim_data_path'],rrs_data_path=conf_['rrs_data_path'],PAR_path=conf_['PAR_path'],zenith_path=conf_['zenith_path'],date_str=conf_['date'],rank=rank,nranks=nranks,comm=comm,my_device=my_device,perturbation_factors = perturbation_factors,constant=constant)
+    oasim_data_path = [conf_['oasim_data_path'].split(date_str)[0] + (date + timedelta(days=i)).strftime(dateformat) + conf_['oasim_data_path'].split(date_str)[1] for i in [-2,-1,0,1,2]]
+    dataset = inversion(dateformat=conf_['dateformat'],scratch_path=conf_['scratch_path'],oasim_data_path=oasim_data_path,rrs_data_path=conf_['rrs_data_path'],PAR_path=conf_['PAR_path'],zenith_path=conf_['zenith_path'],date_str=conf_['date'],rank=rank,nranks=nranks,comm=comm,my_device=my_device,perturbation_factors = perturbation_factors,constant=constant)
 
 
     

@@ -189,8 +189,8 @@ class composed_loss_function(nn.Module):
         self.s_a_inv = s_a.inverse().to(my_device)
 
         rrs_mul = rrs_mul.to(my_device)
-        
-        
+
+        #rrs_cov = torch.einsum('bi,ij,bj->b', diff_rrs, self.rrs_cov_inv, diff_rrs)  # (num_days,)
         rrs_cov = torch.diag(rrs_mul**(-1)).T @ (self.s_e @ torch.diag(rrs_mul**(-1))) # s_e is the covariance matriz of rrs before normalization
         
         self.rrs_cov_inv = rrs_cov.inverse().to(torch.float32).to(my_device)
@@ -205,22 +205,49 @@ class composed_loss_function(nn.Module):
         self.Y_cov_inv = Y_cov.inverse().to(torch.float32).to(my_device)
 
 
-    def forward(self,pred_,Y_obs,rrs,rrs_pred,nan_array,cov_z=None,mu_z=None,parameters=[1]):
+    def forward(self,pred_,Y_obs,rrs,rrs_pred,nan_array):
 
-        rrs_error = torch.trace(   (rrs - rrs_pred) @ ( self.rrs_cov_inv @ (rrs - rrs_pred ).T ) )/(5*pred_.shape[0])
-        lens = torch.tensor([len(element[~element.isnan()])  for element in nan_array]).to(self.precision).to(self.my_device)
-        obs_error = torch.trace(   ((pred_ - Y_obs) @ ( self.Y_cov_inv @ (pred_ - Y_obs ).T ))/lens )/pred_.shape[0]
 
-        cov_z_inv = inv(cov_z)
-        DK = 0.5* torch.sum(torch.log(torch.linalg.det(cov_z)) - torch.log(torch.linalg.det(self.s_a))  + torch.vmap(torch.trace)(cov_z_inv @ self.s_a)   )/pred_.shape[0]\
-            + 0.5* torch.sum(  (mu_z.unsqueeze(1) -0.6447) @ cov_z_inv @ torch.transpose((mu_z.unsqueeze(1) -0.6447),dim0=1,dim1=2)) /(3*pred_.shape[0]) #(0 - nn_model.add)/nn_model.mul = 0.6447
         
-        l2_norm =  (( parameters - 1 )**2).mean()
-        error = rrs_error +  obs_error + DK*self.dk_alpha + l2_norm
-            
+        #custom_array = ((Y_l-pred_l)/self.normalization_values)**2
+        #lens = torch.tensor([len(element[~element.isnan()]) for element in nan_array])
+
+        #means_output = custom_array.sum(axis=1)/lens
+
+        diff_rrs = rrs - rrs_pred
+        rrs_error = torch.einsum('bi,ij,bj->b', diff_rrs, self.rrs_cov_inv, diff_rrs)  # (num_days,)
+        rrs_error = (rrs_error)
+        
+        lens = torch.tensor([len(element[~element.isnan()])  for element in nan_array]).to(self.precision).to(self.my_device)
+        diff_obs = (pred_ - Y_obs)/np.sqrt(lens.unsqueeze(1))
+        obs_error = torch.einsum('bi,ij,bj->b', diff_obs, self.Y_cov_inv, diff_obs)  # (num_days,)
+        obs_error = obs_error
+
+        #diff_dkl_1 = (mu_z - z_hat)
+        #diff_dkl_2 = (z_hat - 0.6447)
+
+        #dkl_error = -torch.einsum('bi,bij,bj->b', diff_dkl_1, cov_z.inverse(), diff_dkl_1) + torch.einsum('bi,ij,bj->b', diff_dkl_2, self.s_a_inv, diff_dkl_2)  # (num_days,)
+        #dkl_error = dkl_error
+
+
+        #DK = 0.5* torch.sum(torch.log(torch.linalg.det(cov_z)) - torch.log(torch.linalg.det(self.s_a))  + torch.vmap(torch.trace)(cov_z_inv @ self.s_a)   )/pred_.shape[0]\
+        #    + 0.5* torch.sum(  (mu_z.unsqueeze(1) -0.6447) @ cov_z_inv @ torch.transpose((mu_z.unsqueeze(1) -0.6447),dim0=1,dim1=2)) /(3*pred_.shape[0]) #(0 - nn_model.add)/nn_model.mul = 0.6447
+        
+        #l2_norm =  (( parameters - 1 )**2).mean() * torch.ones(dkl_error.shape,dtype=self.precision)
+        error = rrs_error +  obs_error #+ 0.0001*l2_norm
+        
         return (error).to(self.my_device)
-
-
+    
+    def DK(self,cov_z=None,mu_z=None):
+        cov_z_inv = cov_z.inverse()
+        det_q = torch.linalg.det(cov_z)
+        det_p = torch.linalg.det(self.s_a)
+        tra_ = torch.einsum('bii->b',cov_z_inv @ self.s_a)
+        diff_mu = (mu_z -0.6447)
+        mu_c_mu = torch.einsum('bi,bij,bj->b',diff_mu,cov_z_inv,diff_mu)
+        
+        DK_divergence = 0.5* (torch.log(det_q) - torch.log(det_p)  + tra_  + mu_c_mu  - 3)
+        return DK_divergence
 
 def mask_nans(Y,kd_pred,bbp_pred,chla_pred,my_device = 'cpu'):
 
@@ -234,25 +261,26 @@ def mask_nans(Y,kd_pred,bbp_pred,chla_pred,my_device = 'cpu'):
     return Y_masked.to(my_device),pred_masked.to(my_device)
 
 def train_one_epoch(epoch_index,training_dataloader,loss_fn,optimizer,model,dates=None,num_samples=1,my_device = 'cpu'):
-       
-    def one_sample(data):
-        inputs,labels_nan = data
-        z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model(inputs)
-        Y_masked, pred_masked = mask_nans(labels_nan,kd_hat,bbp_hat,z_hat,my_device = my_device)
-        # Compute the loss and its gradients
-
-        return loss_fn(pred_masked,Y_masked,inputs[:,0,:5],rrs_hat,labels_nan[:,0,:],cov_z,mu_z,list(model.parameters())[-1])
 
     def one_loop(data):
         # Every data instance is an input + label pair
         optimizer.zero_grad()
-        loss = sum(map(one_sample,[data]*num_samples))
+        
+        inputs,labels_nan = data
+        loss = torch.zeros(inputs.shape[0],dtype=loss_fn.precision)
+        for i in range(num_samples):
+            z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model(inputs)
+            Y_masked, pred_masked = mask_nans(labels_nan,kd_hat,bbp_hat,z_hat,my_device = my_device)
+            loss += loss_fn(pred_masked,Y_masked,inputs[:,0,:5],rrs_hat,labels_nan[:,0,:])
+
         loss /= num_samples
+        loss += 0.0003*loss_fn.DK(cov_z,mu_z) #list(model.parameters())[-1]
+        loss = loss.mean() + 0.5*((list(model.parameters())[-1] - torch.ones(14))**2).mean()
         loss.backward()
         # Adjust learning weights
         optimizer.step()
         # Gather data and report
-        return loss.item()
+        return loss.detach()
     
     list_data = list(iter(training_dataloader))
     return np.mean(list(map(one_loop,list_data)))
@@ -266,7 +294,9 @@ def validation_loop(epoch_index,validation_dataloader,loss_fn,optimizer,model,my
 
         # Compute the loss and its gradients
 
-        vloss = loss_fn(pred_masked,Y_masked,vinputs[:,0,:5],rrs_hat,vlabels_nan[:,0,:],cov_z,mu_z,list(model.parameters())[-1])
+        vloss = loss_fn(pred_masked,Y_masked,vinputs[:,0,:5],rrs_hat,vlabels_nan[:,0,:])
+        vloss += 0.0003*loss_fn.DK(cov_z,mu_z) #list(model.parameters())[-1]
+        vloss = vloss.mean() + 0.5*((list(model.parameters())[-1] - torch.ones(14))**2).mean()
         return vloss.item()
     with torch.no_grad():
         list_data = list(iter(validation_dataloader))
@@ -422,32 +452,49 @@ def explore_hyperparameters():
         best_result.metrics["loss_validation"]))
 
     
-def save_cvae_first_part():
-    experiment_path = '~/ray_results/bohb_minimization_part2'
+def save_cvae_first_part(constant_path1 = MODEL_HOME+'/settings',constant_path2 = MODEL_HOME+'/settings',VAE_output_path = MODEL_HOME+'/settings/reproduce/VAE_model',perturbation_factors_path = MODEL_HOME+'/settings/reproduce/perturbation_factors'):
+    #experiment_path = '~/ray_results/bohb_minimization_part2'
     data_dir = MODEL_HOME+'/settings'
         
-    restored_tuner = tune.Tuner.restore(experiment_path, trainable=partial(train_cifar, data_dir=data_dir))
-    result_grid = restored_tuner.get_results()
+    #restored_tuner = tune.Tuner.restore(experiment_path, trainable=partial(train_cifar, data_dir=data_dir))
+    #result_grid = restored_tuner.get_results()
 
-    best_result = result_grid.get_best_result("loss_validation","min")
+    #best_result = result_grid.get_best_result("loss_validation","min")
  
-    batch_size = int(best_result.config['batch_size'])
-    number_hiden_layers_mean = best_result.config['number_hiden_layers_mean']
-    dim_hiden_layers_mean = best_result.config['dim_hiden_layers_mean']
-    dim_last_hiden_layer_mean = best_result.config['dim_last_hiden_layer_mean']
-    alpha_mean = best_result.config['alpha_mean']
-    number_hiden_layers_cov = best_result.config['number_hiden_layers_cov']
-    dim_hiden_layers_cov = best_result.config['dim_hiden_layers_cov']
-    dim_last_hiden_layer_cov = best_result.config['dim_last_hiden_layer_cov']
-    alpha_cov = best_result.config['alpha_cov']
-    lr = best_result.config['lr']
-    betas1 = best_result.config['betas1'] 
-    betas2 = best_result.config['betas2']
-    dk_alpha = best_result.config['dk_alpha']
+    #batch_size = int(best_result.config['batch_size'])
+    #number_hiden_layers_mean = best_result.config['number_hiden_layers_mean']
+    #dim_hiden_layers_mean = best_result.config['dim_hiden_layers_mean']
+    #dim_last_hiden_layer_mean = best_result.config['dim_last_hiden_layer_mean']
+    #alpha_mean = best_result.config['alpha_mean']
+    #number_hiden_layers_cov = best_result.config['number_hiden_layers_cov']
+    #dim_hiden_layers_cov = best_result.config['dim_hiden_layers_cov']
+    #dim_last_hiden_layer_cov = best_result.config['dim_last_hiden_layer_cov']
+    #alpha_cov = best_result.config['alpha_cov']
+    #lr = best_result.config['lr']
+    #betas1 = best_result.config['betas1'] 
+    #betas2 = best_result.config['betas2']
+    #dk_alpha = best_result.config['dk_alpha']
+    best_result_config = torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_final_config.pt')
+
+    batch_size = int(best_result_config['batch_size'])
+    batch_size = 500
+    number_hiden_layers_mean = best_result_config['number_hiden_layers_mean']
+    dim_hiden_layers_mean = best_result_config['dim_hiden_layers_mean']
+    dim_last_hiden_layer_mean = best_result_config['dim_last_hiden_layer_mean']
+    alpha_mean = best_result_config['alpha_mean']
+    number_hiden_layers_cov = best_result_config['number_hiden_layers_cov']
+    dim_hiden_layers_cov = best_result_config['dim_hiden_layers_cov']
+    dim_last_hiden_layer_cov = best_result_config['dim_last_hiden_layer_cov']
+    alpha_cov = best_result_config['alpha_cov']
+    lr = best_result_config['lr']
+    betas1 = best_result_config['betas1'] 
+    betas2 = best_result_config['betas2']
+    dk_alpha = best_result_config['dk_alpha']
+
 
     my_device = 'cpu'
 
-    constant = rdm.read_constants(file1=data_dir + '/cte_lambda.csv',file2=data_dir+'/cte.csv',my_device = my_device)
+    constant = rdm.read_constants(file1=constant_path1 + '/cte_lambda.csv',file2=constant_path2+'/cte.csv',my_device = my_device)
     train_data = rdm.customTensorData(data_path=data_dir + '/npy_data',which='train',per_day = False,randomice=True,one_dimensional = True,seed = 1853,device=my_device,normilized_NN='scaling')
     train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
 
@@ -465,84 +512,95 @@ def save_cvae_first_part():
     validation_loss = []
     train_loss = []
 
-    perturbation_factors_history = np.empty((1001,14))
+    perturbation_factors_history = np.empty((2001,14))
     perturbation_factors_history[0] = list(iter(model.parameters()))[-1].clone().detach().cpu()
     
 
     
-    list(iter(model.parameters()))[-1].requires_grad = True
+    list(iter(model.parameters()))[-1].requires_grad = False
 
     def one_epoch(epoch):
         init_time = time.time()
+        if epoch == 200:
+            list(model.parameters())[-1].requires_grad = True
+
         train_loss.append(train_one_epoch(epoch,train_dataloader,loss_function,optimizer,model,dates = train_data.dates,num_samples=5,my_device = my_device))
         
         if epoch % 10 == 0:
             print('epoch',epoch,'done in',time.time() - init_time,'seconds','loss:',train_loss[-1])
-            torch.save(model.state_dict(), data_dir+'/VAE_model/model_second_part_save_epoch_'+str(epoch)+'.pt')
+            torch.save(model.state_dict(), VAE_output_path + '/model_second_part_save_epoch_'+str(epoch)+'.pt')
         #if epoch == 499:
         #    list(iter(model.parameters()))[-1].requires_grad = True
         #if epoch >= 500:
         perturbation_factors_history[epoch+1] = list(iter(model.parameters()))[-1].clone().detach()
             
         
-    list(map(one_epoch,range(1000)))
+    list(map(one_epoch,range(2000)))
         
         
-    torch.save(model.state_dict(), data_dir+'/VAE_model/model_second_part_chla_centered_experiment.pt')
-    np.save(data_dir+'/perturbation_factors/perturbation_factors_history_CVAE_chla_centered_experiment.npy',perturbation_factors_history)
-    print('perturbation_factors_history saved in',data_dir+'/perturbation_factors as perturbation_factors_history_CVAE_chla_centered_experiment.npy')
+    torch.save(model.state_dict(), VAE_output_path + '/model_second_part_chla_centered.pt')
+    np.save(perturbation_factors_path + '/perturbation_factors_history_CVAE_chla_centered.npy',perturbation_factors_history)
+    print('perturbation_factors_history saved in',perturbation_factors_path + ' as perturbation_factors_history_CVAE_chla_centered_experiment.npy')
     
+@torch.jit.script
+def get_jacobian_components(original_jacobian,len_: int,comp: int):
+    new_jacobian = original_jacobian[0,:,0,:,:].reshape(comp,3).clone().unsqueeze(0)
+    for i in range(1,len_):
+        new_jacobian = torch.cat((new_jacobian,original_jacobian[i,:,i,:,:].reshape(comp,3).clone().unsqueeze(0)),0)
+    return new_jacobian
 
 
-
-def save_var_uncertainties(Forward_Model, X, chla_hat_mean, covariance_matrix,rrs_hat, constant = None, save_path =MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam',dates = [] ):
+def save_var_uncertainties(Forward_Model, X, chla_hat_mean, covariance_matrix,rrs_hat, constant = None, save_path =MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam',dates = []):
     parameters_eval = chla_hat_mean.unsqueeze(1)
     evaluate_model = fm.evaluate_model_class(Forward_Model,X,constant=constant)
+
         
     X_hat = np.empty((len(parameters_eval),6))
     X_hat[:,::2] = chla_hat_mean.clone().detach()
     X_hat[:,1::2] = torch.sqrt(torch.diagonal(covariance_matrix,dim1=1,dim2=2).clone().detach())
        
-    kd_hat = torch.empty((len(parameters_eval),10))
-    bbp_hat = torch.empty((len(parameters_eval),6))
-    bbp_index = 0
-
+    kd_hat = torch.empty((len(parameters_eval),10),dtype=parameters_eval.dtype)
     kd_values = evaluate_model.kd_der(parameters_eval)
-    kd_derivative = torch.empty((len(parameters_eval),5,3))
-    kd_derivative_ = torch.autograd.functional.jacobian(evaluate_model.kd_der,inputs=(parameters_eval))
-    
+
+    kd_derivative = torch.empty((len(parameters_eval),5,3),dtype=parameters_eval.dtype)
     for i in range(len(parameters_eval)):
-        kd_derivative[i] = torch.reshape(kd_derivative_[i,:,i,:,:],(5,3))
-               
-    kd_delta = fm.error_propagation(kd_derivative,covariance_matrix)
+        evaluate_model.X = X[i].unsqueeze(0)
+        kd_derivative[i] = torch.autograd.functional.jacobian(evaluate_model.kd_der,inputs=(torch.unsqueeze(parameters_eval[i],0)))[0,:,0,0,:]
+
+    kd_delta = fm.error_propagation(kd_derivative,covariance_matrix.clone().detach())
     kd_hat[:,::2] = kd_values.clone().detach()
     kd_hat[:,1::2] = torch.sqrt(kd_delta).clone().detach()
+
+    bbp_hat = torch.empty((len(parameters_eval),6),dtype=parameters_eval.dtype)
     bbp_values = evaluate_model.bbp_der(parameters_eval)
 
-    bbp_derivative = torch.empty((len(parameters_eval),3,3))
-    bbp_derivative_ = torch.autograd.functional.jacobian(evaluate_model.bbp_der,inputs=(parameters_eval))
+    bbp_derivative = torch.empty((len(parameters_eval),3,3),dtype=parameters_eval.dtype)
     for i in range(len(parameters_eval)):
-        bbp_derivative[i] = torch.reshape(bbp_derivative_[i,:,i,:,:],(3,3))
+        evaluate_model.X = X[i].unsqueeze(0)
+        bbp_derivative[i] = torch.autograd.functional.jacobian(evaluate_model.bbp_der,inputs=(torch.unsqueeze(parameters_eval[i],0)))[0,:,0,0,:]
         
-    bbp_delta = fm.error_propagation(bbp_derivative,covariance_matrix)
+    bbp_delta = fm.error_propagation(bbp_derivative,covariance_matrix.clone().detach())
     bbp_hat[:,::2] = bbp_values.clone().detach()
     bbp_hat[:,1::2] = torch.sqrt(bbp_delta).clone().detach()
 
     rrs_hat = rrs_hat.clone().detach() 
 
-    np.save(save_path + '/X_hat_experiment.npy',X_hat)
-    np.save(save_path + '/RRS_hat_experiment.npy',rrs_hat)
-    np.save(save_path + '/kd_hat_experiment.npy',kd_hat)
-    np.save(save_path + '/bbp_hat_experiment.npy',bbp_hat)
-    np.save(save_path + '/dates_experiment.npy',dates)
+    np.save(save_path + '/X_hat.npy',X_hat)
+    np.save(save_path + '/RRS_hat.npy',rrs_hat)
+    np.save(save_path + '/kd_hat.npy',kd_hat)
+    np.save(save_path + '/bbp_hat.npy',bbp_hat)
+    np.save(save_path + '/dates.npy',dates)
     
 if __name__ == '__main__':
 
 
 
     #explore_hyperparameters()
-
-    #save_cvae_first_part()
+    torch.set_num_threads(1)
+    
+    #save_cvae_first_part(constant_path1 = MODEL_HOME+'/settings',constant_path2 = MODEL_HOME+'/settings',VAE_output_path = MODEL_HOME+'/settings/reproduce/VAE_model',perturbation_factors_path = MODEL_HOME+'/settings/reproduce/perturbation_factors')
+    
+    #save_cvae_first_part(constant_path1 = MODEL_HOME+'/settings/cte_lambda_dukiewicz',constant_path2 = MODEL_HOME+'/settings',VAE_output_path = MODEL_HOME+'/settings/reproduce_dukiewicz/VAE_model',perturbation_factors_path = MODEL_HOME+'/settings/reproduce_dukiewicz/perturbation_factors')
 
     
     data_dir = MODEL_HOME + '/settings'
@@ -568,13 +626,10 @@ if __name__ == '__main__':
     betas1 = best_result_config['betas1'] 
     betas2 = best_result_config['betas2']
     dk_alpha = best_result_config['dk_alpha']
-    print(best_result_config)
-    sys.exit()
-
 
     my_device = 'cpu'
 
-    constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',my_device = my_device)
+    constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',my_device = my_device)
     data = rdm.customTensorData(data_path=data_dir+'/npy_data',which='all',per_day = False,randomice=False,one_dimensional = True,seed = 1853,device=my_device,normilized_NN='scaling')
 
     dataloader = DataLoader(data, batch_size=len(data.x_data), shuffle=False)
@@ -585,7 +640,9 @@ if __name__ == '__main__':
                            dim_hiden_layers_cov = dim_hiden_layers_cov,alpha_cov=alpha_cov,dim_last_hiden_layer_cov = dim_last_hiden_layer_cov,x_mul=data.x_mul,x_add=data.x_add,\
                            y_mul=data.y_mul,y_add=data.y_add,constant = constant,model_dir = HOME_PATH + '/settings/VAE_model').to(my_device)
 
-    model.load_state_dict(torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))
+    model.load_state_dict(torch.load(MODEL_HOME + '/settings/reproduce_dukiewicz/VAE_model/model_second_part_chla_centered.pt'))
+    print(mode.state_dict())
+    sys.exit()
     X,Y = next(iter(dataloader))
     
     z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model(X)
@@ -599,8 +656,8 @@ if __name__ == '__main__':
     bbp_hat = bbp_hat * data.y_mul[6:] + data.y_add[6:]
     rrs_hat = rrs_hat * data.x_mul[:5] + data.x_add[:5]
     X = model.rearange_RRS(X)
-        
-    save_var_uncertainties(model.Forward_Model,X,mu_z,cov_z,rrs_hat,constant=constant,dates = data.dates,save_path =MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla')
+
+    save_var_uncertainties(model.Forward_Model,X,mu_z,cov_z,rrs_hat,constant=constant,dates = data.dates,save_path =MODEL_HOME + '/settings/reproduce_dukiewicz/results_VAE_VAEparam_chla')
     
     
 

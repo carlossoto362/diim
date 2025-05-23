@@ -334,7 +334,7 @@ def fill_params(constant):
                               )
     return params
 
-def read_constants(file1=HOME_PATH+'/settings/cte_lambda.csv',file2=HOME_PATH+'/settings/cte.csv',tensor = True,my_device = 'cpu',dict=False):
+def read_constants(file1=HOME_PATH+'/settings/cte_lambda.csv',file2=HOME_PATH+'/settings/cte.csv',tensor = True,my_device = 'cpu',dict=False,precision=torch.float32):
     """
     function that reads the constants stored in file1 and file2. 
     file1 has the constants that are dependent on lambda, is a csv with the columns
@@ -353,7 +353,7 @@ def read_constants(file1=HOME_PATH+'/settings/cte_lambda.csv',file2=HOME_PATH+'/
         for i in range(len(cts_lambda['lambda'])):
             constant[key][str(cts_lambda['lambda'].iloc[i])] = cts_lambda[key].iloc[i]
         if tensor == True:
-            constant[key] = torch.tensor(list(constant[key].values()),dtype=torch.float32).to(my_device)
+            constant[key] = torch.tensor(list(constant[key].values()),dtype=precision).to(my_device)
         else:
             constant[key] = np.array(list(constant[key].values()))
     cts = pd.read_csv(file2)

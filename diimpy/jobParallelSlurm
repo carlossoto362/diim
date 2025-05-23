@@ -1,0 +1,20 @@
+#! /bin/bash
+
+#SBATCH --job-name=diim_maps_1
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=40
+#SBATCH --time=2:00:00
+#SBATCH --account=OGS23_PRACE_IT
+#SBATCH --partition=g100_usr_prod
+
+source /g100/home/userexternal/csotolop/load_modules.sh eat
+
+export DIIM_PATH=/g100_work/OGS23_PRACE_IT/csoto/DIIM
+export DIIM_ENV_PATH=/g100_work/OGS23_PRACE_IT/csoto/DIIM
+
+date
+
+#export RANKS_PER_NODE=1
+mpirun --mca pml ob1 --mca btl tcp,self -n 40 /g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/bin/python3 /g100_work/OGS23_PRACE_IT/csoto/DIIM/diimpy/sensitivity_analysis_and_mcmc_runs.py
+
+date

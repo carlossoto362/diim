@@ -523,13 +523,13 @@ class Forward_Model(nn.Module):
     def __init__(self,precision = torch.float32,num_days=1,learning_chla = True,learning_perturbation_factors = False):
         super().__init__()
         if learning_chla == True:
-            self.chparam = nn.Parameter(torch.rand((num_days,1,3), dtype=torch.float32), requires_grad=True)
+            self.chparam = nn.Parameter(torch.rand((num_days,1,3), dtype=precision), requires_grad=True)
         self.learning_chla = learning_chla
 
         if learning_perturbation_factors == False:
-            self.perturbation_factors = torch.ones(14, dtype=torch.float32)
+            self.perturbation_factors = torch.ones(14, dtype=precision)
         else:
-            self.perturbation_factors =  nn.Parameter(torch.ones(14, dtype=torch.float32), requires_grad=True)
+            self.perturbation_factors =  nn.Parameter(torch.ones(14, dtype=precision), requires_grad=True)
 
         self.perturbation_factors_names = [
             '$\epsilon_{a,ph}$',
@@ -655,7 +655,7 @@ class evaluate_model_class():
 
 class RRS_loss(nn.Module):
 
-    def __init__(self,x_a,s_a,s_e,precision = torch.float32,num_days=1,my_device = 'cpu'):
+    def __init__(self,x_a,s_a,s_e,precision = torch.float32,num_days:int =1,my_device:str = 'cpu'):
         super(RRS_loss, self).__init__()
         """
         Class to evaluate the loss function RRS_loss = -2log(p(z|x,y)), minus the log posterior distribution of the latent variable z=(chla,nap,cdom). 
@@ -665,31 +665,40 @@ class RRS_loss(nn.Module):
           s_a: covariance matrix of the prior for chla, nap and cdom, dimension (3,3).
           s_e: covariance matrix of RRS. Dimension (5,5).
         """
-        self.x_a = torch.stack([x_a for _ in range(num_days)]).to(my_device)
-        self.s_a = s_a.to(my_device)
-        self.s_e = s_e.to(my_device)
+        self.x_a = torch.stack([x_a for _ in range(num_days)]).to(my_device).to(precision)
+        self.s_a = s_a.to(my_device).to(precision)
+        self.s_e = s_e.to(my_device).to(precision)
         self.s_e_inverse = torch.inverse(self.s_e)
         self.s_a_inverse = torch.inverse(self.s_a)
         self.precision = precision
 
 
-    def forward(self,y,f_x,x,test = False):
-        if test == True:
-            print( torch.trace(  (y - f_x) @ ( self.s_e_inverse @ (y - f_x ).T )),torch.trace( (x[:,0,:] - self.x_a) @( self.s_a_inverse @ (x[:,0,:] - self.x_a).T )))
-        return  torch.trace(   (y - f_x) @ ( self.s_e_inverse @ (y - f_x ).T ) +  (x[:,0,:] - self.x_a) @( self.s_a_inverse @ (x[:,0,:] - self.x_a).T )  ).to(self.precision)
+    def forward(self,y,f_x,x):
+        diff_y = y - f_x                  # (num_days, 5)
+        diff_x = x[:, 0, :] - self.x_a    # (num_days, 5)
+
+        # Compute batch-wise quadratic forms
+        term1 = torch.einsum('bi,ij,bj->b', diff_y, self.s_e_inverse, diff_y)  # (num_days,)
+        term2 = torch.einsum('bi,ij,bj->b', diff_x, self.s_a_inverse, diff_x)  # (num_days,)
+
+        total = term1 + term2
+        loss = total.mean()
+        return loss
 
 class OBS_loss(nn.Module):
 
-    def __init__(self,precision = torch.float32,my_device = 'cpu'):
+    def __init__(self,precision = torch.float32,my_device:str = 'cpu',normalization_values = torch.tensor([1,1,1,1,1,1,1,1,1])):
         super(OBS_loss, self).__init__()
         self.precision = precision
+        self.normalization_values = torch.tensor(normalization_values).to(my_device).to(precision)
 
 
     def forward(self,Y_l,pred_l,nan_array):
-        custom_array = ((Y_l-pred_l))**2
+        
+        custom_array = ((Y_l-pred_l)/self.normalization_values)**2
         lens = torch.tensor([len(element[~element.isnan()]) for element in nan_array])
 
-        means_output = custom_array.sum(axis=1)/lens
+        means_output = torch.sum(custom_array,dim=1)/lens
         return means_output.mean().to(self.precision)
 
 if __name__ == "__main__":

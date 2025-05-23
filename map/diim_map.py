@@ -244,6 +244,7 @@ class read_map_class():
             
             y_data[y_data < -900.] = np.nan
             x_data[x_data < -900.] = np.nan
+            
             self.x_data = tensor(x_data[non_nan_points]).to(my_precision)
             self.y_data = tensor(y_data[non_nan_points]).to(my_precision)
             self.non_nan_points = non_nan_points
@@ -317,10 +318,11 @@ def local_initial_conditions_nn(F_model,constant,data,precision = float32,my_dev
 
     if tisnan(mu_z).any():
         mu_z[targwhere(tisnan(mu_z))] = trand(mu_z[targwhere(tisnan(mu_z))].shape,dtype=float32)
+    mu_z[mu_z > 3.5] = tensor(3.5,dtype = float32)
 
-    state_dict = F_model.state_dict()
-    state_dict['chparam']  = mu_z.unsqueeze(1)
-    F_model.load_state_dict(state_dict)
+    #state_dict = F_model.state_dict()
+    #state_dict['chparam']  = mu_z.unsqueeze(1)
+    #F_model.load_state_dict(state_dict)
     #print('time for NN data,', time.time() - init_time_)
     return mu_z
 
@@ -675,6 +677,15 @@ def inversion(dateformat='%Y%m%d-%H:%M:%S',scratch_path=HOME_PATH + '/scratch',o
             if np.isnan(output['X_hat']).all():
                 model = Forward_Model(num_days=len_batch).to(my_device)
                 model.perturbation_factors = perturbation_factors
+                #chla_NN_sen = local_initial_conditions_nn(model,constant,data,precision = float32,my_device = 'cpu').numpy()
+
+                
+                #state_dict_chla = chla_NN_sen
+                #state_dict_chla[state_dict_chla>0] = trand(state_dict_chla[state_dict_chla>0].shape,dtype = float32)
+                #state_dict = model.state_dict()
+                #state_dict['chparam']  = state_dict
+                #model.load_state_dict(state_dict)
+    
                 loss = RRS_loss(x_a,s_a,s_e,num_days=len_batch,my_device = my_device)
                 optimizer = Adam(model.parameters(),lr=lr)
                 output = train_loop(data,model,loss,optimizer,4000,kind='all',\
@@ -979,18 +990,19 @@ if __name__ == '__main__':
     date = datetime.strptime(date_str,conf_['dateformat'])
 
     ##
-    #date_str = '20000406'
-    #dateformat = '%Y%m%d'
-    #conf_['rrs_data_path'] = rrs_data_file = '/g100_scratch/userexternal/csotolop/DIIM_output/RRS/'+date_str+'_cmems_obs-oc_med_bgc-reflectance_my_l3-multi-1km_P1D.nc'
-    #conf_['oasim_data_path'] = oasim_data_path = '/g100_scratch/userexternal/csotolop/DIIM_output/OASIM_maps/oasim_map_'+date_str+'.nc'
-    #conf_['dateformat'] = '%Y%m%d'
-    #conf_['date'] = date_str
-    #date = datetime.strptime(date_str,conf_['dateformat'])
-    #time_utc = datetime(year = date.year,month = date.month,day=date.day,hour=11)
-    #output_data_path = conf_['output_path'] = '/g100_scratch/userexternal/csotolop/DIIM_output/diim_maps'+ '/diim_map_' + date_str + '.nc'
+    date_str = '20000406'
+    dateformat = '%Y%m%d'
+    conf_['rrs_data_path'] = rrs_data_file = '/g100_scratch/userexternal/csotolop/DIIM_output/RRS/'+date_str+'_cmems_obs-oc_med_bgc-reflectance_my_l3-multi-1km_P1D.nc'
+    conf_['oasim_data_path'] = oasim_data_path = '/g100_scratch/userexternal/csotolop/DIIM_output/OASIM_maps/oasim_map_'+date_str+'.nc'
+    conf_['dateformat'] = '%Y%m%d'
+    conf_['date'] = date_str
+    date = datetime.strptime(date_str,conf_['dateformat'])
+    time_utc = datetime(year = date.year,month = date.month,day=date.day,hour=11)
+    output_data_path = conf_['output_path'] = '/g100_scratch/userexternal/csotolop/DIIM_output/diim_maps'+ '/diim_map_' + date_str + '.nc'
     ##
 
     oasim_data_path = [conf_['oasim_data_path'].split(date_str)[0] + (date + timedelta(days=i)).strftime(dateformat) + conf_['oasim_data_path'].split(date_str)[1] for i in [-2,-1,0,1,2]]
+
     dataset = inversion(dateformat=conf_['dateformat'],scratch_path=conf_['scratch_path'],oasim_data_path=oasim_data_path,rrs_data_path=conf_['rrs_data_path'],PAR_path=conf_['PAR_path'],zenith_path=conf_['zenith_path'],date_str=conf_['date'],rank=rank,nranks=nranks,comm=comm,my_device=my_device,perturbation_factors = perturbation_factors,constant=constant)
 
 

@@ -101,22 +101,22 @@ def bayesian_part():
     print('')
 
     iprint('To recreate the paper, we first run alternate minimization with an approximately uniform prior (alpha >> 1).')
-    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
+    iprint('''Would you like to run this part?, results will be stored in HOME_PATH/settings/reproduce/, but next procedures will done using pre-stored data in reproduce_dukiewicz. (type yes/no)''')
     flag=iflag()
     if flag == 'yes':
-        iprint('This part saves the history of perturbation_factors_used in DIIM_PATH + "/settings/reproduce/perturbation_factors/perturbation_factors_history_new.pt"')
-        cprint("track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/settings/reproduce/perturbation_factors',iterations=1000,save=True )")
-        bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/settings/reproduce/perturbation_factors',iterations=1000,save=True )
+        iprint('This part saves the history of perturbation_factors_used in DIIM_PATH + "/settings/reproduce/perturbation_factors/perturbation_factors_history_loss_normilized.pt"')
+        cprint("bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/settings/reproduce/perturbation_factors',iterations=3000,save=True,name='perturbation_factors_history_loss_normilized.npy',constant_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv' ,steps_z=20,num_threads=1)")
+        bayes.track_parameters(data_path = MODEL_HOME + '/settings/npy_data',output_path = MODEL_HOME + '/settings/reproduce/perturbation_factors',iterations=3000,save=True,name='perturbation_factors_history_loss_normilized.npy',constant_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv' ,steps_z=20,num_threads=1)
             
     print('')
 
             
-    iprint('With these perturbation factors, we tuned the prior parameter alpha (see the paper, Appendix B). This step is necessary because, for each day, the inversion is performed using only five wavelengths. With such limited data, the prior significantly influences the uncertainty. Our approach to tuning alpha is similar to Bayesian model specification, where, assuming Gaussianity, the best model balances fitting the data and minimizing individual uncertainties.')
-    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
+    iprint('With these perturbation factors, we tuned the prior parameter alpha (see the paper, Appendix B). This step is necessary because, for each day, the inversion is performed using only five wavelengths. With such limited data, the prior significantly influences the uncertainty.')
+    iprint('''Would you like to run this part?, results will be stored in HOME_PATH/settings/reproduce/, but next procedures will done using pre-stored data in reproduce_dukiewicz. (type yes/no)''')
     flag=iflag()
     if flag == 'yes':
-        iprint('This step saves the output of the Bayesian minimization with the different α values in DIIM_PATH + "/settings/reproduce/alphas". For this step, we used the perturbation factors from the previous step, specifically the ones saved in DIIM_PATH + "/settings/perturbation_factors/perturbation_factors_history_AM_test.npy".')
-        cprint("track_alphas(output_path = MODEL_HOME + '/settings/reproduce/alphas',save=True)")
+        iprint('This step saves the output of the Bayesian minimization with the different α values in DIIM_PATH + "/settings/reproduce/alphas". For this step, we used the perturbation factors in DIIM_PATH + "/settings/reproduce_dukiewicz/perturbation_factors/perturbation_factors_history_loss_normilized.npy".')
+        cprint("bayes.track_alphas(output_path = MODEL_HOME + '/settings/reproduce/alphas',save=True)")
         print('')
         iprint('This can take a bit of time...')
         bayes.track_alphas(output_path = MODEL_HOME + '/settings/reproduce/alphas',save=True)
@@ -124,86 +124,21 @@ def bayesian_part():
             
     iprint('Finally, we run the inversion using the best alpha and the optimal perturbation factors to obtain the historical optical constituents along with their uncertainties.')
 
-    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
-    results_AM_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam' 
+    iprint('''Would you like to run this part?, results will be stored in HOME_PATH/settings/reproduce/, but next procedures will done using pre-stored data in reproduce_dukiewicz. (type yes/no)''')
     flag=iflag()
     if flag == 'yes':
         iprint('This may take a bit of time...')
-        print(""">>>data = rdm.customTensorData(data_path=MODEL_HOME + '/settings/npy_data',which='all',per_day = True,randomice=False)
-        >>>perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy'))[-1].to(torch.float32)
-
+        print(""">>>bayes.run_save_result(num_threads=1,data_path = MODEL_HOME + '/settings/npy_data',precision=torch.float64,perturbation_factors_file = MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors/perturbation_factors_history_loss_normilized.npy',unperturbed=False,my_device = 'cpu',constant_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',constant_path2=MODEL_HOME + '/settings/cte.csv',output_path = MODEL_HOME+'/settings/reproduce/results_lognormal_AMparam',report_loss = True,save_files=True,perturbation_history=True,mean_last=True)""")
+        bayes.run_save_result(num_threads=1,data_path = MODEL_HOME + '/settings/npy_data',precision=torch.float64,perturbation_factors_file = MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors/perturbation_factors_history_loss_normilized.npy',unperturbed=False,my_device = 'cpu',constant_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',constant_path2=MODEL_HOME + '/settings/cte.csv',output_path = MODEL_HOME+'/settings/reproduce/results_lognormal_AMparam',report_loss = True,save_files=True,perturbation_history=True,mean_last=True)
         
-        >>>my_device = 'cpu' # the forward computations are not optimal to run with cuda
-        >>>constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',my_device = my_device)
-        
-        >>>lr = 0.029853826189179603 #tuned by runing with many lr's
-        >>>x_a = torch.zeros(3)
-        >>>s_a_ = torch.eye(3)
-        >>>s_e = (torch.eye(5)*torch.tensor([1.5e-3,1.2e-3,1e-3,8.6e-4,5.7e-4]))**(2)#validation rmse from https://catalogue.marine.copernicus.eu/documents/QUID/CMEMS-OC-QUID-009-141to144-151to154.pdf
-        >>>batch_size = data.len_data
-        >>>dataloader = DataLoader(data, batch_size=batch_size, shuffle=False)
-        >>>s_a = s_a_*4.9 #this is the best alpha 
-        
-        >>>model = fm.Forward_Model(num_days=batch_size).to(my_device)
-        >>>model.perturbation_factors = perturbation_factors
-        >>>loss = fm.RRS_loss(x_a,s_a,s_e,num_days=batch_size,my_device = my_device)
-        >>>optimizer = torch.optim.Adam(model.parameters(),lr=lr)
-        
-        >>>output = bayes.train_loop(next(iter(dataloader)),model,loss,optimizer,4000,kind='all',\
-        num_days=batch_size,constant = constant,perturbation_factors_ = perturbation_factors, scheduler = True)
-        
-        >>>output_path = MODEL_HOME+'/settings/reproduce/results_AM'
-        >>>np.save(output_path + '/X_hat.npy',output['X_hat'])
-        >>>np.save(output_path + '/kd_hat.npy',output['kd_hat'])
-        >>>np.save(output_path + '/bbp_hat.npy',output['bbp_hat'])
-        >>>np.save(output_path + '/RRS_hat.npy',output['RRS_hat'])
-        >>>np.save(output_path + '/dates.npy',data.dates) """)
-        
-        data = rdm.customTensorData(data_path=MODEL_HOME + '/settings/npy_data',which='all',per_day = True,randomice=False)
-        perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy'))[-1].to(torch.float32)
-        
-        
-        my_device = 'cpu'
-        constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',my_device = my_device)
-        
-        lr = 0.029853826189179603
-        x_a = torch.zeros(3)
-        s_a_ = torch.eye(3)
-        s_e = (torch.eye(5)*torch.tensor([1.5e-3,1.2e-3,1e-3,8.6e-4,5.7e-4]))**(2)#validation rmse from https://catalogue.marine.copernicus.eu/documents/QUID/CMEMS-OC-QUID-009-141to144-151to154.pdf
-        batch_size = data.len_data
-        dataloader = DataLoader(data, batch_size=batch_size, shuffle=False)
-        s_a = s_a_*4.9
-        
-        model = fm.Forward_Model(num_days=batch_size).to(my_device)
-        model.perturbation_factors = perturbation_factors
-        loss = fm.RRS_loss(x_a,s_a,s_e,num_days=batch_size,my_device = my_device)
-        optimizer = torch.optim.Adam(model.parameters(),lr=lr)
-        
-        output = bayes.train_loop(next(iter(dataloader)),model,loss,optimizer,4000,kind='all',\
-                                  num_days=batch_size,constant = constant,perturbation_factors_ = perturbation_factors, scheduler = True)
-        
-        output_path = MODEL_HOME+'/settings/reproduce/results_AM'
-        results_AM_path = output_path
-        np.save(output_path + '/X_hat.npy',output['X_hat'])
-        np.save(output_path + '/kd_hat.npy',output['kd_hat'])
-        np.save(output_path + '/bbp_hat.npy',output['bbp_hat'])
-        np.save(output_path + '/RRS_hat.npy',output['RRS_hat'])
-        np.save(output_path + '/dates.npy',data.dates)
-
     iprint('We can also plot these results, along with the output of the neural network (explained in the forward step), using the module plot_data_lognormal.py')
     cprint("from diimpy import plot_data_lognormal as pdl")
     
-    cprint("""pdl.plot_chla(input_data_path = results_AM_path,\
-              figname = MODEL_HOME + '/experiments/chla_lognormal_data_chla_centered.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
-              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
-              third_data_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',log_scale=True)
+    cprint("""pdl.plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce/plots',results_name_timeline='/results_lognormal_AMparam',output_plot_prefix='_lognormal_VAEparam',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
     """)
-    pdl.plot_chla(input_data_path = results_AM_path,\
-              figname = MODEL_HOME + '/experiments/chla_lognormal_data_chla_centered.pdf',save=False,date_init = datetime(year=2005,month=1,day=1),\
-              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
-              third_data_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',log_scale=True)
+    pdl.plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce/plots',results_name_timeline='/results_lognormal_VAEparam',output_plot_prefix='_lognormal_AMparam',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
 
-    
+    iprint('The plots are stored in ' +MODEL_HOME + '/settings/reproduce/plots/..._lognormal_AMparam.pdf')
         
 def mcmc_part():
 
@@ -229,7 +164,7 @@ This function calculates the Jacobians at the specified perturbation_factors. ""
     
     >>>my_device = 'cpu'
     
-    >>>constant = rdm.read_constants(file1=data_dir + '/../cte_lambda.csv',file2=data_dir+'/../cte.csv',my_device = my_device)
+    >>>constant = rdm.read_constants(file1=data_dir + '/../cte_lambda_dukiewicz/cte_lambda.csv',file2=data_dir+'/../cte.csv',my_device = my_device)
     >>>data = rdm.customTensorData(data_path=data_dir,which='all',per_day = True,randomice=False,one_dimensional = False,seed = 1853,device=my_device)
     >>>dataloader = DataLoader(data, batch_size=len(data.x_data), shuffle=False)
 
@@ -252,7 +187,7 @@ This function calculates the Jacobians at the specified perturbation_factors. ""
     
     my_device = 'cpu'
     
-    constant = rdm.read_constants(file1=data_dir + '/../cte_lambda.csv',file2=data_dir+'/../cte.csv',my_device = my_device)
+    constant = rdm.read_constants(file1=data_dir + '/../cte_lambda_dukiewicz/cte_lambda.csv',file2=data_dir+'/../cte.csv',my_device = my_device)
     data = rdm.customTensorData(data_path=data_dir,which='all',per_day = True,randomice=False,one_dimensional = False,seed = 1853,device=my_device)
     dataloader = DataLoader(data, batch_size=len(data.x_data), shuffle=False)
     
@@ -270,110 +205,38 @@ This function calculates the Jacobians at the specified perturbation_factors. ""
     mcmc.sensitivity_boxplot(jacobian_rrs,jacobian_kd,jacobian_bbp,rrs_hat,kd_hat,bbp_hat,perturbation_factors,X,\
                              title='Sensitivity of the parameters with the literature values')
 
-    iprint('Next, we run an MCMC algorithm with initial conditions close to the output of the alternate minimization (AM). We expect this output to be close to the mode of the distribution, which would result in a small tail to cut from the MCMC chain.')
-    iprint('''Would you like to run this part? (type yes) or use pre-computed data (type no)''')
-    num_runs = 40
-    output_path = MODEL_HOME + '/experiments/mcmc/'
+    iprint('Next, we run an MCMC algorithm with initial conditions close to the output of the alternate minimization (AM). We expect this output to be close to the mode of the distribution, which would result in a small tail to cut from the MCMC chain. This part is very slow, so to make it fast, we worked in a closter, in such a way that each chain could be done in a different core. To make the test faster, we could use chains approximating each iteration with very few iterations towards the minimum, but in the paper, we used 200 iterations per step. If one core is used per chain (currently, 40) the expected time for this part would be around 1 hour. If is taking too long, you can cancel the run by precing ctl+x.')
+    iprint('''Would you like to run this part (not advisable without multiple cores)?, results will be stored in HOME_PATH/settings/reproduce/, but next procedures will done using pre-stored data in reproduce_dukiewicz. (type yes/no)''')
+    
     
     flag=iflag()
     if flag == 'yes':
-        num_runs = 20
-        output_path = MODEL_HOME + '/settings/reproduce/mcmc/'
-        cprint('>>>output_path = MODEL_HOME + "/settings/reproduce/mcmc/"')
-        cprint('>>>mcmc.mcmc(output_path = output_path)')
-        print('')
-        iprint("We will create 20 mcmc runs, and store them in DIIM_PATH + 'settings/reproduce/mcmc/run_' + str(j)+'.npy', with j from 0 to 19. As espected, will take some time...")
-        mcmc.mcmc(output_path = output_path)
+        print('''>>>from mpi4py import MPI
+                 >>>comm = MPI.COMM_WORLD
+                 >>>rank  = comm.Get_rank()
+                 >>>nranks = comm.size''')
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        rank  = comm.Get_rank()
+        nranks = comm.size
+        cprint("mcmc.mcmc(output_path = MODEL_HOME + '/settings/reproduce/mcmc/', perturbation_factors_path = MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors/perturbation_factors_history_loss_normilized.npy',constant_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',constant_path2=MODEL_HOME + '/settings/cte.csv',chla_hat_path = MODEL_HOME+'/settings/reproduce_dukiewicz/results_AM',rank=rank,nranks=nranks)")
+        mcmc.mcmc(output_path = MODEL_HOME + '/settings/reproduce/mcmc/', perturbation_factors_path = MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors/perturbation_factors_history_loss_normilized.npy',constant_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',constant_path2=MODEL_HOME + '/settings/cte.csv',chla_hat_path = MODEL_HOME+'/settings/reproduce_dukiewicz/results_AM',rank=rank,nranks=nranks)
+        
     iprint(""" Now we can read our MCMC runs (I did 40 runs), compute autocorrelations to discard self-correlated elements, or plot the final parameters obtained by averaging the final perturbation factors after discarding the tail and the self-correlated elements. Here, we will only plot, but the rest of the code can be found in the sensitivity_analysis_and_mcmc_runs.py script.
 
-Important: We stored the perturbation factors as perturbation_factors_mcmc_mean/std, using only uncorrelated values, excluding the tail. However, to plot the next figure, we will plot everything, as we want to show the entire MCMC chain.""")
-    
-    indexes = rdm.customTensorData(data_path=data_dir,which='all',per_day = True,randomice=True,one_dimensional = False,seed = 1853,device=my_device).train_indexes
-    perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
-    perturbation_factors_NN = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(torch.float32).mean(axis=0)
-    perturbation_factors_NN_std = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(torch.float32).std(axis=0)
-    chla_hat = torch.tensor(np.load( MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/X_hat.npy')[:,[0,2,4]]).to(torch.float32).unsqueeze(1)[indexes]
-    constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
+Important: We stored the perturbation factors as perturbation_factors_mcmc_mean/std, using only uncorrelated values, excluding the tail. However, to plot the next figure, we will plot everything, as we want to show the entire MCMC chain. Since for the last part we used multiple cores, to plot, we have to specify that we will use only one of them...
 
-    mcmc_runs = np.empty((num_runs,3000,14))
+>>>if rank == 0:
+        mcmc.analize_mcmc_result(perturbation_factors_path=MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors',results_path = MODEL_HOME+'/settings/reproduce_dukiewicz',constant_path1 = MODEL_HOME+'/settings/cte_lambda_dukiewicz',constant_path2 = MODEL_HOME+'/settings' ,mcmc_runs_path = MODEL_HOME + '/settings/reproduce_dukiewicz/mcmc',plots_path = MODEL_HOME + '/settings/reproduce/plots')""")
+    try:
+        if rank == 0: pass
+    except:
+        rank = 0
+    if rank == 0:
+        mcmc.analize_mcmc_result(perturbation_factors_path=MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors',results_path = MODEL_HOME+'/settings/reproduce_dukiewicz',constant_path1 = MODEL_HOME+'/settings/cte_lambda_dukiewicz',constant_path2 = MODEL_HOME+'/settings' ,mcmc_runs_path = MODEL_HOME + '/settings/reproduce_dukiewicz/mcmc',plots_path = MODEL_HOME + '/settings/reproduce/plots')
+        iprint("Since one of the previous steps could be run in multiple cores, and the NN part is not, to see the NN part please run python3 reproduce.py -n")
 
-
-    for i in range(num_runs):
-        mcmc_runs[i] = np.load(output_path + '/run_' + str(i)+'.npy')
-
-    perturbation_factors_mcmc = np.reshape(mcmc_runs[:,2000::280,:],(mcmc_runs[:,2000::280,:].shape[0]*mcmc_runs[:,2000::280,:].shape[1],14)).mean(axis=0)
-
-    mcmc_runs = mcmc_runs[:,:,5:] * constant_values
-
-    mcmc_runs_mean = np.mean(mcmc_runs,axis=0)
-    mcmc_percentile_2_5 = np.percentile(mcmc_runs,2.5,axis=0)
-    
-    mcmc_percentile_98_5 = np.percentile(mcmc_runs,98.5,axis=0)
-    mcmc_percentile_16 = np.percentile(mcmc_runs,16,axis=0)
-    mcmc_percentile_84 = np.percentile(mcmc_runs,84,axis=0)
-    
-    
-    fig_labels = ['(a)','(b)','(c)','(d)','(e)','(f)','(g)','(h)','(i)']
-    names = ['$d_{\mathrm{CDOM}}$ [$\mathrm{m}^2(\mathrm{mgCDOM})^{-1}$]','$S_{\mathrm{CDOM}}$ [nm]','$Q_a$','$Q_b$',\
-             '$\Theta^{\mathrm{min}}_{\mathrm{chla}}$ [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]','$\Theta^{\mathrm{0}}_{\mathrm{chla}}$  [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]',\
-             '$\\beta$ [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$\sigma$  [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$b_{b,\mathrm{NAP}}$']
-    which = 3
-    fig,axs = plt.subplots(ncols=2,nrows=1,layout='constrained',width_ratios=[3/4,1/4])
-
-    axs[0].axhline( y = constant_values[which],linestyle='--',label='original value',color='black')
-    axs[0].axhline( y = mcmc_runs_mean[500:,which].mean(),linestyle='dashdot',label='mcmc relaxation mean',color='blue')
-    axs[0].axhline( y = constant_values[which]*perturbation_factors_NN[5+which],linestyle='dashdot',label='CVAE result',color='#f781bf')
-    
-    
-
-    ynew = scipy.ndimage.uniform_filter1d(mcmc_runs_mean[:,which], size=100)
-    axs[0].plot(ynew,label='mcmc')
-
-    ynew1 = scipy.ndimage.uniform_filter1d(mcmc_percentile_2_5[:,which], size=100)
-    ynew2 = scipy.ndimage.uniform_filter1d(mcmc_percentile_98_5[:,which], size=100)
-    axs[0].fill_between(range(3000), ynew1, ynew2,color='gray',zorder = 0.1,alpha=0.6,label = '95% confidence interval of mcmc')
-    
-    ynew1 = scipy.ndimage.uniform_filter1d(mcmc_percentile_16[:,which], size=100)
-    ynew2 = scipy.ndimage.uniform_filter1d(mcmc_percentile_84[:,which], size=100)
-    axs[0].fill_between(range(3000), ynew1, ynew2,color='#377eb8',zorder = 0.1,alpha=0.8,label = '63% confidence interval of mcmc')
-    
-
-
-    axs[0].set_xlim(0,3000)
-    axs[0].text(-0.1,1.05,'(a)',transform = axs[0].transAxes,fontsize=20)
-    axs[0].set_ylabel(names[which])
-    axs[0].set_xlabel('Iterations')
-
-    axs[0].legend()
-
-    data = mcmc_runs[:,2000:,which] #cuting the tail
-    data = data[:,::280].flatten() # uncorrelated values
-    data = data
-    
-    
-    n,bins,patches = axs[1].hist(data,orientation='horizontal',bins=40,edgecolor='black',color='#377eb8',alpha=0.6,density=True)
-    (mu, sigma) = scipy.stats.norm.fit(data)
-    axs[1].plot(scipy.stats.norm.pdf(bins,loc=mu,scale=sigma),bins , linewidth=2,color='black',label='normal distribution\nmean: {:.3f}\nstd: {:.3f}'.format(mu,sigma))
-    axs[1].legend()
-    axs[1].text(-0.1,1.05,'(b)',transform = axs[1].transAxes,fontsize=20)
-    axs[1].set_xlabel('Probability density')
-
-    axs[1].set_yticks([])
-    axs[0].set_ylim(*axs[1].get_ylim())
-    plt.show()
-    plt.close()
-    mcmc_runs = mcmc_runs[:,2000:,:]
-
-    iprint('We can also plot the lambda dependent parameters,')
-    cprint("mcmc.plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')")
-    print('')
-    mcmc.plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')
-    iprint('Or even create a table with the statistics of the parameters (this table is in latex table format, use plot=False,table=True to create it as in the paper),')
-    cprint("constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])")
-    cprint('mcmc.parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False)')
-    constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
-    mcmc.parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False,constant_values=constant_values,perturbation_factors = perturbation_factors_mcmc,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels)
-
+        
 def NN_part():
     iprint(''' A different approach is to use the SGVB framework (see the paper, section 4.5). It consists of training a probabilistic neural network with a latent variable structure. The final architecture and parameters for the neural network were tuned using Ray Tune. As described in the README file, this framework consists of three parts.
 
@@ -422,7 +285,7 @@ The state dictionary of the neural network after training is saved in DIIM_PATH 
 
     >>>my_device = 'cpu'
 
-    >>>constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',my_device = my_device)
+    >>>constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',my_device = my_device)
     >>>data = rdm.customTensorData(data_path=data_dir+'/npy_data',which='all',per_day = False,randomice=False,one_dimensional = True,seed = 1853,device=my_device,normilized_NN='scaling')
 
     >>>dataloader = DataLoader(data, batch_size=len(data.x_data), shuffle=False)
@@ -433,7 +296,7 @@ The state dictionary of the neural network after training is saved in DIIM_PATH 
                            dim_hiden_layers_cov = dim_hiden_layers_cov,alpha_cov=alpha_cov,dim_last_hiden_layer_cov = dim_last_hiden_layer_cov,x_mul=data.x_mul,x_add=data.x_add,\
                            y_mul=data.y_mul,y_add=data.y_add,constant = constant,model_dir = HOME_PATH + '/settings/VAE_model').to(my_device)
 
-    >>>model.load_state_dict(torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))
+    >>>model.load_state_dict(torch.load(MODEL_HOME + '/settings/reproduce_dukiewicz/VAE_model/model_second_part_chla_centered.pt'))
     >>>X,Y = next(iter(dataloader))
     
     >>>z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model(X)
@@ -462,7 +325,7 @@ The state dictionary of the neural network after training is saved in DIIM_PATH 
 
     my_device = 'cpu'
 
-    constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',my_device = my_device)
+    constant = rdm.read_constants(file1=MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',my_device = my_device)
     data = rdm.customTensorData(data_path=data_dir+'/npy_data',which='all',per_day = False,randomice=False,one_dimensional = True,seed = 1853,device=my_device,normilized_NN='scaling')
 
     dataloader = DataLoader(data, batch_size=len(data.x_data), shuffle=False)
@@ -473,7 +336,7 @@ The state dictionary of the neural network after training is saved in DIIM_PATH 
                            dim_hiden_layers_cov = dim_hiden_layers_cov,alpha_cov=alpha_cov,dim_last_hiden_layer_cov = dim_last_hiden_layer_cov,x_mul=data.x_mul,x_add=data.x_add,\
                            y_mul=data.y_mul,y_add=data.y_add,constant = constant,model_dir = HOME_PATH + '/settings/VAE_model').to(my_device)
 
-    model.load_state_dict(torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))
+    model.load_state_dict(torch.load(MODEL_HOME + '/settings/reproduce_dukiewicz/VAE_model/model_second_part_chla_centered.pt'))
     X,Y = next(iter(dataloader))
     
     z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model(X)

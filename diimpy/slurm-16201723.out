@@ -1,0 +1,241 @@
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Tue May 13 11:46:31 CEST 2025
+saving run 30 ...
+saving run 31 ...
+saving run 34 ...
+saving run 35 ...
+saving run 36 ...
+saving run 37 ...
+saving run 38 ...
+saving run 39 ...
+saving run 0 ...
+saving run 1 ...
+saving run 2 ...
+saving run 5 ...
+saving run 6 ...
+saving run 7 ...
+saving run 8 ...
+saving run 9 ...
+saving run 11 ...
+saving run 12 ...
+saving run 13 ...
+saving run 14 ...
+saving run 15 ...
+saving run 17 ...
+saving run 18 ...
+saving run 19 ...
+saving run 22 ...
+saving run 23 ...
+saving run 24 ...
+saving run 25 ...
+saving run 26 ...
+saving run 27 ...
+saving run 32 ...
+saving run 33 ...
+saving run 10 ...
+saving run 16 ...
+saving run 20 ...
+saving run 21 ...
+saving run 28 ...
+saving run 29 ...
+saving run 3 ...
+saving run 4 ...
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_1.npy saved, time 810.960960149765
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_0.npy saved, time 812.4874505996704
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_13.npy saved, time 825.2450611591339
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_35.npy saved, time 825.8831140995026
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_22.npy saved, time 825.9314424991608
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_2.npy saved, time 826.5644807815552
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_37.npy saved, time 827.7979309558868
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_33.npy saved, time 828.254472732544
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_20.npy saved, time 828.3254475593567
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_4.npy saved, time 828.6264336109161
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_25.npy saved, time 829.5027544498444
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_6.npy saved, time 829.5600154399872
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_21.npy saved, time 829.5844779014587
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_27.npy saved, time 829.8995966911316
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_15.npy saved, time 830.3305661678314
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_18.npy saved, time 831.4184730052948
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_14.npy saved, time 831.5300121307373
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_23.npy saved, time 831.7218573093414
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_29.npy saved, time 831.7313899993896
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_34.npy saved, time 832.0188488960266
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_36.npy saved, time 832.2249209880829
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_17.npy saved, time 832.7519536018372
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_9.npy saved, time 832.8473374843597
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_11.npy saved, time 833.2530975341797
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_24.npy saved, time 833.3496584892273
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_31.npy saved, time 833.6087262630463
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_3.npy saved, time 833.6921277046204
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_38.npy saved, time 833.7559332847595
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_7.npy saved, time 833.8974306583405
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_19.npy saved, time 834.5191912651062
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_26.npy saved, time 834.5891637802124
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_10.npy saved, time 835.903687953949
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_28.npy saved, time 836.2283828258514
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_5.npy saved, time 837.0004277229309
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_39.npy saved, time 837.1154403686523
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_16.npy saved, time 837.3777306079865
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_12.npy saved, time 837.5266253948212
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_30.npy saved, time 838.6144654750824
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_32.npy saved, time 838.8607726097107
+/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce_dukiewicz/mcmc//run_8.npy saved, time 839.0551509857178
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+499
+                                         ${a_{PH}}$  ...  ${b_{b,\mathrm{NAP}}}$
+${a_{PH}}$                                 1.000000  ...                0.582849
+${b_{phy,T}}$                              0.093393  ...                0.020644
+${b_{phy,\mathrm{Int}}}$                  -0.022476  ...               -0.102247
+${b_{b,phy,T}}$                            0.049227  ...               -0.016487
+${b_{b,phy,\mathrm{Int}}}$                -0.034946  ...                0.084572
+${d_{\mathrm{CDOM}}}$                      0.529576  ...                0.332748
+${S_{\mathrm{CDOM}}}$                      0.619968  ...                0.435870
+${Q_a}$                                   -0.389016  ...               -0.352724
+${Q_b}$                                    0.143922  ...                0.226519
+${\Theta^{\text{min}}_{\mathrm{chla}}}$    0.052633  ...                0.027705
+${\Theta^{\mathrm{0}}_{\mathrm{chla}}}$   -0.138195  ...               -0.025623
+${\beta}$                                 -0.561981  ...               -0.632306
+${\sigma}$                                -0.171996  ...                0.013360
+${b_{b,\mathrm{NAP}}}$                     0.582849  ...                1.000000
+
+[14 rows x 14 columns]
+$\delta_i,i=$ & ${a_{PH}}$ & ${b_{phy,T}}$ & ${b_{phy,\mathrm{Int}}}$ & ${b_{b,phy,T}}$ & ${b_{b,phy,\mathrm{Int}}}$ & ${d_{\mathrm{CDOM}}}$ & ${S_{\mathrm{CDOM}}}$ & ${Q_a}$ & ${Q_b}$ & ${\Theta^{\text{min}}_{\mathrm{chla}}}$ & ${\Theta^{\mathrm{0}}_{\mathrm{chla}}}$ & ${\beta}$ & ${\sigma}$ & ${b_{b,\mathrm{NAP}}}$\\\hline
+${a_{PH}}$ & 1.00&&&&&&&&&&&&&\\
+${b_{phy,T}}$ & 0.09 & 1.00&&&&&&&&&&&&\\
+${b_{phy,\mathrm{Int}}}$ & -0.02 & 0.11 & 1.00&&&&&&&&&&&\\
+${b_{b,phy,T}}$ & 0.05 & -0.09 & -0.07 & 1.00&&&&&&&&&&\\
+${b_{b,phy,\mathrm{Int}}}$ & -0.03 & 0.20 & 0.03 & -0.17 & 1.00&&&&&&&&&\\
+${d_{\mathrm{CDOM}}}$ & 0.53 & -0.02 & 0.25 & 0.07 & -0.01 & 1.00&&&&&&&&\\
+${S_{\mathrm{CDOM}}}$ & 0.62 & 0.01 & 0.05 & 0.01 & -0.02 & 0.28 & 1.00&&&&&&&\\
+${Q_a}$ & -0.39 & -0.16 & -0.01 & -0.03 & -0.00 & -0.26 & -0.12 & 1.00&&&&&&\\
+${Q_b}$ & 0.14 & -0.11 & -0.03 & 0.13 & 0.15 & 0.26 & 0.03 & 0.21 & 1.00&&&&&\\
+${\Theta^{\text{min}}_{\mathrm{chla}}}$ & 0.05 & 0.25 & 0.06 & 0.18 & -0.20 & 0.01 & 0.03 & -0.02 & -0.06 & 1.00&&&&\\
+${\Theta^{\mathrm{0}}_{\mathrm{chla}}}$ & -0.14 & 0.23 & 0.15 & -0.08 & 0.15 & -0.13 & -0.07 & 0.00 & -0.14 & 0.09 & 1.00&&&\\
+${\beta}$ & -0.56 & 0.09 & 0.04 & -0.11 & 0.11 & -0.52 & -0.29 & 0.46 & -0.33 & -0.08 & 0.15 & 1.00&&\\
+${\sigma}$ & -0.17 & -0.16 & -0.19 & 0.15 & 0.15 & -0.05 & -0.00 & 0.16 & 0.20 & -0.21 & -0.21 & 0.01 & 1.00&\\
+${b_{b,\mathrm{NAP}}}$ & 0.58 & 0.02 & -0.10 & -0.02 & 0.08 & 0.33 & 0.44 & -0.35 & 0.23 & 0.03 & -0.03 & -0.63 & 0.01 & 1.00\\
+[[1.52322398e-02 1.07770321e-02 4.94513216e+00 ... 4.77913141e+02
+  1.89303782e+01 5.72936657e-03]
+ [1.52372132e-02 1.07695499e-02 4.94697729e+00 ... 4.78001136e+02
+  1.89369996e+01 5.72585076e-03]
+ [1.52354673e-02 1.07632684e-02 4.94844189e+00 ... 4.78165212e+02
+  1.89487582e+01 5.72848353e-03]
+ ...
+ [8.65704219e-03 9.66912344e-03 5.33324184e+00 ... 5.67667910e+02
+  1.89673219e+01 3.75463391e-03]
+ [8.65389264e-03 9.67273644e-03 5.33291181e+00 ... 5.67724878e+02
+  1.89584635e+01 3.75481715e-03]
+ [8.64689249e-03 9.66087480e-03 5.33744843e+00 ... 5.67611802e+02
+  1.89599284e+01 3.75337770e-03]]
+(40, 1000, 9)
+&Original value&CVAE result&MCMC result&KS test for normality&KS p-value for normality\\\hline
+$d_{\mathrm{CDOM}}$ [$\mathrm{m}^2(\mathrm{mgCDOM})^{-1}$]&0.0150&0.0156 &0.0101 $\pm$ 0.0028&0.0536&7.259E-01\\
+$S_{\mathrm{CDOM}}$ [nm]&0.0170&0.0111 &0.0099 $\pm$ 0.0005&0.0553&6.907E-01\\
+$Q_a$&5.3300&4.4960 &5.3861 $\pm$ 0.2899&0.0495&8.087E-01\\
+$Q_b$&0.4500&0.4283 &0.4441 $\pm$ 0.0463&0.0742&3.250E-01\\
+$\Theta^{\mathrm{min}}_{\mathrm{chla}}$ [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]&0.0050&0.0049 &0.0048 $\pm$ 0.0006&0.0708&3.810E-01\\
+$\Theta^{\mathrm{0}}_{\mathrm{chla}}$  [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]&0.0300&0.0251 &0.0296 $\pm$ 0.0027&0.0637&5.135E-01\\
+$\beta$ [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]&500.0000&589.2924 &558.5273 $\pm$ 33.5500&0.1090&4.129E-02\\
+$\sigma$  [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]&20.0000&20.3714 &18.8886 $\pm$ 2.2417&0.0732&3.420E-01\\
+$b_{r,\mathrm{NAP}}$&0.0050&0.0024 &0.0041 $\pm$ 0.0008&0.0545&7.077E-01\\
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/diimpy/read_data_module.py:232: RuntimeWarning: invalid value encountered in divide
+  self.x_normilized = (self.x_data - self.x_mean)/self.x_std
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/numpy/lib/function_base.py:2854: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/g100_work/OGS23_PRACE_IT/csoto/eat/eat_env/lib/python3.8/site-packages/numpy/lib/function_base.py:2855: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+Tue May 13 12:01:30 CEST 2025

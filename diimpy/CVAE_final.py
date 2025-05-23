@@ -40,7 +40,7 @@ class NN_second_layer(nn.Module):
 
         self.flatten = nn.Flatten()
         
-        self.first_layer = NN_first_layer().to(self.my_device)
+        self.first_layer = NN_first_layer().to(self.my_device).to(self.precision)
         self.first_layer.load_state_dict(torch.load(model_dir+'/model_first_part.pt'))
         self.first_layer.eval()
         for param in self.first_layer.parameters():
@@ -58,7 +58,7 @@ class NN_second_layer(nn.Module):
             nn.CELU(alpha=alpha_mean),
             nn.Linear(19,3),
             nn.CELU(alpha=alpha_mean)
-        )
+        ).to(self.precision)
 
         alpha_cov = 0.7414694152899
         self.linear_celu_stack_cov = nn.Sequential(
@@ -68,7 +68,7 @@ class NN_second_layer(nn.Module):
             nn.CELU(alpha=alpha_cov),
             nn.Linear(11,9),
             nn.CELU(alpha=alpha_cov)
-        )
+        ).to(self.precision)
         x_mul = [0.00553, 0.0049, 0.00319, 0.00185, 0.00154, 14.159258, 17.414488, 17.922438, 17.255323, 16.621885, 22.62492, 28.752264, 31.301714, 31.038338, 30.96801, 45.952972, 586.7632]
         y_mul = [4.9446263, 0.2707657, 0.36490566, 0.2853425, 0.2712304, 0.16722172, 0.004955111, 0.0035161567, 0.004354275]
         x_add = [0.00203, 0.00204, 0.0022, 0.00196, 0.00117, 2.5095496, 2.9216232, 2.914767, 2.7880442, 2.4963162, 0.002233, 0.0019174, 0.0017812, 0.0018124, 0.0016976, 20.611382, 34.561928]
@@ -79,7 +79,7 @@ class NN_second_layer(nn.Module):
         self.x_add = torch.tensor(x_add).to(self.precision).to(self.my_device)
         self.y_add = torch.tensor(y_add).to(self.precision).to(self.my_device)
 
-        self.Forward_Model = Forward_Model(learning_chla = False, learning_perturbation_factors = True)
+        self.Forward_Model = Forward_Model(learning_chla = False, learning_perturbation_factors = True,precision=self.precision)
         self.bbp = bbp
         self.kd = kd
         self.constant = constant
@@ -101,7 +101,7 @@ class NN_second_layer(nn.Module):
         if self.chla_centered == True:
             mu_z += torch.column_stack((x[:,0,0],x[:,0,0],x[:,0,0])) 
         Cholesky_z = torch.tril(self.linear_celu_stack_cov(x).flatten(1).reshape((x.shape[0],3,3)))/10
-        epsilon = torch.randn(torch.Size([x.shape[0],1,3]),generator=torch.Generator().manual_seed(0)).to(self.my_device)
+        epsilon = torch.randn(torch.Size([x.shape[0],1,3]),generator=torch.Generator().manual_seed(0),dtype=self.precision).to(self.my_device)
 
         z_hat = mu_z + torch.transpose(Cholesky_z@torch.transpose(epsilon,dim0=1,dim1=2),dim0=1,dim1=2).flatten(1) 
         z_hat_inter = z_hat

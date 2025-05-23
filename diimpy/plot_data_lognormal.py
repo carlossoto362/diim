@@ -295,10 +295,10 @@ def plot_kd(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal
     for i,lam in enumerate(lambdas_names):
         columns.append(('kd_'+ lam,'kd_output_' + lam,'delta_kd_output_'+lam,'kd_outputVAE_'+lam))
         names.append('$kd_{'+lambdas_values[i]+'}$ $[\mathrm{m}^{-1}$]')
-        labels.append((*labels_names,*labels_names,'Generative Neural Network Output'))
+        labels.append((*labels_names,*labels_names,'Observation operator with NN inuts'))
 
 
-    plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = True,num_cols=num_cols,\
+    plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = False,num_cols=num_cols,\
                   figname = figname,fontsize=25,colors = 1,save=save,figsize = figsize,indexes = indexes,ylim=ylim,log_scale = log_scale)
 
 def plot_bbp(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal_logparam',ylim=[],indexes=None,\
@@ -335,9 +335,9 @@ def plot_bbp(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognorma
         if (i == 1) or (i == 2) or (i ==4):
             columns.append(('bbp_'+ lam,'bbp_output_' + lam,'delta_bbp_output_'+lam,'bbp_outputVAE_' + lam))
             names.append('$b_{b,p,'+lambdas_values[i]+'}$ $[m^{-1}]$')
-            labels.append((*labels_names,*labels_names,'Generative Neural Network Output'))
+            labels.append((*labels_names,*labels_names,'Observation operator with NN inputs'))
 
-    plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = True,num_cols=num_cols,\
+    plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = False,num_cols=num_cols,\
                   figname = figname,fontsize=25,colors = 1,save=save,figsize = figsize,indexes = indexes,ylim=ylim,log_scale = log_scale)
 
 def plot_chla(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal_logparam',ylim=[],\
@@ -373,20 +373,20 @@ def plot_chla(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognorm
     
     columns.append(('chla','chla_output','delta_chla_output','chla_outputVAE'))
     names.append('$\mathrm{Chl-a }$ $[\mathrm{mg}\mathrm{m}^{-3}]$')
-    labels.append((*labels_names,*labels_names,'Generative Neural Network Output'))
+    labels.append((*labels_names,*labels_names,'Neural Network approximation'))
 
     columns.append(('NAP','NAP_output','delta_NAP_output','NAP_outputVAE'))
     names.append('$\mathrm{NAP }$ $[\mathrm{mg} \mathrm{m}^{-3}]$')
-    labels.append((*labels_names,*labels_names,'Generative Neural Network Output'))
+    labels.append((*labels_names,*labels_names,'Neural Network approximation'))
 
     columns.append(('CDOM','CDOM_output','delta_CDOM_output','CDOM_outputVAE'))
     names.append('$\mathrm{CDOM }$ $[\mathrm{mg}\mathrm{m}^{-3}]$')
-    labels.append((*labels_names,*labels_names,'Generative Neural Network Output'))
+    labels.append((*labels_names,*labels_names,'Neural Network approximation'))
 
-    plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = True,num_cols=num_cols,\
+    plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = False,num_cols=num_cols,\
                   figname = figname,fontsize=25,colors = 1,save=save,figsize = figsize,indexes = indexes,ylim=ylim,log_scale = log_scale)
 
-def comparison_alphas():
+def comparison_alphas(alphas_path=MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/alphas',output_path=MODEL_HOME + '/experiments/plots',output_name='comparison_alphas.pdf'):
     data = data_dataframe(MODEL_HOME + '/settings/npy_data',which = 'all')
     data['chla'] = np.exp(data['chla'])
     data['NAP'] = np.nan
@@ -395,17 +395,18 @@ def comparison_alphas():
     second_runs_errors = pd.DataFrame(columns = ['alpha','epsilon_rrs','error_output_mean','error_mean','epsilon_error'])
     alphas = []
     k=0
-    for file_ in os.listdir(MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/alphas'):
-        if file_ == 'dates.npy':
+    for file_ in os.listdir(alphas_path):
+        if (file_ == 'dates.npy') or (file_ == '.gitignore'):
             continue
         
         name_ = file_.split('_')
         alpha = '.'.join(name_[2].split('.')[:2])
+        
         if (alpha in alphas):
             pass
         else:
             alphas.append(alpha)
-            second_run_i = read_second_run(MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/alphas',include_uncertainty=True,abr='output',name_index = alpha )
+            second_run_i = read_second_run(alphas_path,include_uncertainty=True,abr='output',name_index = alpha )
 
             second_run_i['delta_chla_output'] = np.sqrt(scipy.stats.lognorm.var(second_run_i['delta_chla_output'],scale=np.exp(second_run_i['chla_output'])))
             second_run_i['chla_output'] = scipy.stats.lognorm.median(second_run_i['delta_chla_output'],scale=np.exp(second_run_i['chla_output']))
@@ -462,11 +463,12 @@ def comparison_alphas():
     
     ax[1].scatter(second_runs_errors['alpha'],second_runs_errors['epsilon_error'],label='$\epsilon_{\delta_{chla}} =  MEAN(|RMSD(chla^{OBS} , chla^{MOD}) - MEAN(\delta_{chla})|)$',c = colors[1],marker='x',s=s)
     ax[2].scatter(second_runs_errors['alpha'],Loss_function,label='$\mathbf{L} =\overline{ \epsilon_{R_{RS}} }  + \overline{  \epsilon_{\delta_{chla}}}$',c = colors[5],marker='^',s=s)
-    
-    ax[0].axvline(4.87,linestyle='--',color='red')
-    ax[1].axvline(4.87,linestyle='--',color='red')
-    ax[2].axvline(4.87,linestyle='--',color='red')
-    ax[2].text(4.88,1,'$\mathrm{argmin}_{\\alpha}(\mathbf{L}$)',color=colors[5])
+
+    min_Loss = second_runs_errors['alpha'].iloc[np.argmin(Loss_function)]
+    ax[0].axvline(min_Loss,linestyle='--',color='red')
+    ax[1].axvline(min_Loss,linestyle='--',color='red')
+    ax[2].axvline(min_Loss,linestyle='--',color='red')
+    ax[2].text(min_Loss + 0.01,1,'$\mathrm{argmin}_{\\alpha}(\mathbf{L}$)' + '={:.2f}'.format(min_Loss),color=colors[5])
 
     ax[0].text(-0.1,1.05,'(a)',transform = ax[0].transAxes)
     ax[1].text(-0.1,1.05,'(b)',transform = ax[1].transAxes)
@@ -485,7 +487,7 @@ def comparison_alphas():
     for axis in ax[:2]:
         axis.xaxis.set_visible(False)
     fig.tight_layout()
-    plt.show()
+    plt.savefig(output_path + '/' + output_name)
             
 
 
@@ -659,158 +661,166 @@ def plot_constants_1(perturbation_path = MODEL_HOME + '/settings/perturbation_fa
 
     plt.show()
 
-def plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_VAE.npy'):
+def plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',save_path =  MODEL_HOME + '/settings/reproduce/plots',constants_path1 = MODEL_HOME + '/settings',constants_path2 = MODEL_HOME + '/settings'):
     
-    perturbation_factors_history_NN = torch.tensor(np.load(perturbation_path + '/'+vae_name)).to(torch.float32)[:400]
-    perturbation_factors_history_lognormal = torch.tensor(np.load(perturbation_path + '/perturbation_factors_history_AM_test.npy')).to(torch.float32)[:400]
-    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME+'/settings/cte.csv',dict=True)
+    perturbation_factors_history_NN = np.load(perturbation_path + '/perturbation_factors_history_CVAE_chla_centered.npy')[-300:].mean(axis=1)
+    perturbation_factors_history_lognormal =np.load(perturbation_path + '/perturbation_factors_history_loss_normilized.npy')[-1]
+    perturbation_factors_mean = np.load(perturbation_path + '/perturbation_factors_mcmc_mean.npy')
+    perturbation_factors_std = np.load(perturbation_path + '/perturbation_factors_mcmc_std.npy')
+    constant = read_constants(file1=constants_path1 + '/cte_lambda.csv',file2=constants_path2+'/cte.csv',dict=True)
 
     labs = ['(a)','(b)','(c)']
 
-    def plot_track_absortion_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,len_past = 300,cmap = plt.cm.Blues):
+    def plot_track_absortion_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,perturbation_factors_mean,perturbation_factors_std,cmap = plt.cm.Blues):
 
         lambdas = np.array([412.5,442.5,490,510,555])
-        storical_absortion_ph_NN =   (   past_perturbation_factors_NN[:,0].reshape((len_past,1))*constant['absortion_PH'].numpy() ).T
-        storical_absortion_ph_lognormal =   (   past_perturbation_factors_lognormal[:,0].reshape((len_past,1))*constant['absortion_PH'].numpy() ).T
-        #print('a')
-        #print((storical_absortion_ph_lognormal[-1] - storical_absortion_ph_NN[-1]))
+        original_values = constant['absortion_PH'].numpy()
+        storical_absortion_ph_NN =    past_perturbation_factors_NN[0]*(constant['absortion_PH'].numpy())
+        storical_absortion_ph_lognormal =    past_perturbation_factors_lognormal[0]*(constant['absortion_PH'].numpy())
+        storical_absortion_ph_mean =    perturbation_factors_mean[0]*(constant['absortion_PH'].numpy())
+        storical_absortion_ph_std =    perturbation_factors_std[0]*(constant['absortion_PH'].numpy())
 
-        percentages = np.abs((   np.abs(storical_absortion_ph_lognormal.T[0] - storical_absortion_ph_lognormal.T[-1])   -   \
-                                 np.abs(storical_absortion_ph_NN.T[0] - storical_absortion_ph_NN.T[-1])   )/((storical_absortion_ph_lognormal.T[0] - storical_absortion_ph_lognormal.T[-1])))
-        print(np.abs(storical_absortion_ph_lognormal.T[0] - storical_absortion_ph_lognormal.T[-1]),np.abs(storical_absortion_ph_NN.T[0] - storical_absortion_ph_NN.T[-1]),\
-              np.abs(storical_absortion_ph_lognormal.T[0] - storical_absortion_ph_lognormal.T[-1])   -   np.abs(storical_absortion_ph_NN.T[0] - storical_absortion_ph_NN.T[-1]) )
-        print(percentages[percentages<1],'relative change between them.........................')
-
-
-        ax_.plot(lambdas,storical_absortion_ph_NN[:,-1],color = 'gray',label = 'NN')
-        ax_.plot(lambdas,storical_absortion_ph_lognormal[:,-1],color = '#377eb8', label = 'BM')
-        ax_.plot(lambdas,storical_absortion_ph_lognormal[:,0],'--',color = 'gray', label = 'Original values',alpha=0.5)
+        ax_.plot(lambdas,storical_absortion_ph_NN,color = '#377eb8',label = 'SGVB')
+        ax_.plot(lambdas,original_values,'--',color = 'black', label = 'Original values',alpha=0.5)
         ax_.set_xticks(lambdas,['412.5','442.5','490','510','555'])
-        ax_.set_xlabel('Wavelenght [nm]',fontsize=10)
-        ax_.set_ylabel('$a_{PH}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=10)
-        ax_.tick_params(axis='y', labelsize=10)
-        ax_.tick_params(axis='x', labelsize=10)
+        ax_.set_xlabel('Wavelenght [nm]',fontsize=40)
+        ax_.set_ylabel('$a_{phy}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=40)
+        ax_.tick_params(axis='y', labelsize=35)
+        ax_.tick_params(axis='x', labelsize=35)
+
+        ax_.fill_between(lambdas, storical_absortion_ph_mean - storical_absortion_ph_std, \
+                         storical_absortion_ph_mean + storical_absortion_ph_std,color='#bfbfbf',zorder = 0.1,alpha=0.8,label='63% confidence interval')
+        ax_.plot(lambdas,storical_absortion_ph_mean,color = 'gray',label = 'mcmc mean value')
     
 
 
-    def plot_track_scattering_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,len_past = 300, cmap = plt.cm.Blues):
+    def plot_track_scattering_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,perturbation_factors_mean,perturbation_factors_std, cmap = plt.cm.Blues):
 
         lambdas = np.array([412.5,442.5,490,510,555])
         #print(constant)
-        storical_scattering_ph_NN =   (   past_perturbation_factors_NN[:,1].reshape((len_past,1))*constant['linear_regression_slope_s']*lambdas\
-                                   +   past_perturbation_factors_NN[:,2].reshape((len_past,1))*constant['linear_regression_intercept_s'] ).T
-        storical_scattering_ph_lognormal =   (   past_perturbation_factors_lognormal[:,1].reshape((len_past,1))*constant['linear_regression_slope_s']*lambdas\
-                                         +        past_perturbation_factors_lognormal[:,2].reshape((len_past,1))*constant['linear_regression_intercept_s'] ).T
+        original_values = constant['linear_regression_slope_s']*lambdas + (constant['linear_regression_intercept_s'])
+        storical_scattering_ph_NN =   past_perturbation_factors_NN[1]*(constant['linear_regression_slope_s'])*lambdas\
+                                   +   past_perturbation_factors_NN[2]*(constant['linear_regression_intercept_s'])
+        storical_scattering_ph_lognormal =   past_perturbation_factors_lognormal[1]*(constant['linear_regression_slope_s'])*lambdas\
+                                   +   past_perturbation_factors_lognormal[2]*(constant['linear_regression_intercept_s'])
+        storical_scattering_ph_mean =   perturbation_factors_mean[1]*(constant['linear_regression_slope_s'])*lambdas\
+                                   +   perturbation_factors_mean[2]*(constant['linear_regression_intercept_s'])
+        storical_scattering_ph_std =   perturbation_factors_std[1]*(constant['linear_regression_slope_s'])*lambdas\
+                                   +   perturbation_factors_std[2]*(constant['linear_regression_intercept_s'])
 
-        ax_.plot(lambdas,storical_scattering_ph_NN[:,-1],color = 'gray',label='NN')
-        ax_.plot(lambdas,storical_scattering_ph_lognormal[:,-1],color = '#377eb8', label = 'BM')
-        ax_.plot(lambdas,storical_scattering_ph_lognormal[:,0],'--',color = 'gray', label = 'Original values',alpha=0.5)
+        ax_.plot(lambdas,storical_scattering_ph_NN,color = '#377eb8',label='SGVB')
+        ax_.plot(lambdas,original_values,'--',color = 'black', label = 'Original values',alpha=0.5)
         ax_.set_xticks(lambdas,['412.5','445.5','490','510','555'])
-        ax_.set_xlabel('Wavelenght [nm]',fontsize=10)
-        ax_.set_ylabel('$b_{PH}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1})$',fontsize=10)
-        ax_.tick_params(axis='y', labelsize=10)
-        ax_.tick_params(axis='x', labelsize=10)
+        ax_.set_xlabel('Wavelenght [nm]',fontsize=40)
+        ax_.set_ylabel('$b_{phy}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=40)
+        ax_.tick_params(axis='y', labelsize=35)
+        ax_.tick_params(axis='x', labelsize=35)
+
+        ax_.fill_between(lambdas, storical_scattering_ph_mean - storical_scattering_ph_std,\
+                         storical_scattering_ph_mean + storical_scattering_ph_std,color='#bfbfbf',zorder = 0.1,alpha=0.8,label='63% confidence interval')
+        ax_.plot(lambdas,storical_scattering_ph_mean,color = 'gray',label = 'mcmc mean value')
     
-    def plot_track_backscattering_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,len_past = 300,cmap = plt.cm.Blues):
+    def plot_track_backscattering_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,perturbation_factors_mean,perturbation_factors_std,cmap = plt.cm.Blues):
 
         lambdas = np.array([412.5,442.5,490,510,555])
-        storical_scattering_ph_NN =   (   past_perturbation_factors_NN[:,3].reshape((len_past,1))*constant['linear_regression_slope_b']*lambdas\
-                                   +   past_perturbation_factors_NN[:,4].reshape((len_past,1))*constant['linear_regression_intercept_b'] ).T
+        #print(constant)
+        original_values = constant['linear_regression_slope_b']*lambdas + (constant['linear_regression_intercept_b'])
+        storical_backscattering_ph_NN =   past_perturbation_factors_NN[3]*(constant['linear_regression_slope_b'])*lambdas\
+                                   +   past_perturbation_factors_NN[4]*(constant['linear_regression_intercept_b'])
+        storical_backscattering_ph_lognormal =   past_perturbation_factors_lognormal[3]*(constant['linear_regression_slope_b'])*lambdas\
+                                   +   past_perturbation_factors_lognormal[4]*(constant['linear_regression_intercept_b'])
+        storical_backscattering_ph_mean =   perturbation_factors_mean[3]*(constant['linear_regression_slope_b'])*lambdas\
+                                   +   perturbation_factors_mean[4]*(constant['linear_regression_intercept_b'])
+        storical_backscattering_ph_std =   perturbation_factors_std[3]*(constant['linear_regression_slope_b'])*lambdas\
+                                   +   perturbation_factors_std[4]*(constant['linear_regression_intercept_b'])
 
-        storical_scattering_ph_lognormal =   (   past_perturbation_factors_lognormal[:,3].reshape((len_past,1))*constant['linear_regression_slope_b']*lambdas\
-                                        +   past_perturbation_factors_lognormal[:,4].reshape((len_past,1))*constant['linear_regression_intercept_b'] ).T
-
-        percentages = np.abs((   np.abs(storical_scattering_ph_lognormal.T[0] - storical_scattering_ph_lognormal.T[-1])   -   np.abs(storical_scattering_ph_NN.T[0] - storical_scattering_ph_NN.T[-1])   )/((storical_scattering_ph_lognormal.T[0] - storical_scattering_ph_lognormal.T[-1])))
-        print( np.abs(storical_scattering_ph_lognormal.T[0] - storical_scattering_ph_lognormal.T[-1]),np.abs(storical_scattering_ph_NN.T[0] - storical_scattering_ph_NN.T[-1]))
-        print(percentages[percentages<1],'relative change between them.........................')
-        
-        ax_.plot(lambdas,storical_scattering_ph_NN[:,-1],color = 'gray',label = 'NN')
-        ax_.plot(lambdas,storical_scattering_ph_lognormal[:,-1],color = '#377eb8', label = 'BM')
-        ax_.plot(lambdas,storical_scattering_ph_lognormal[:,0],'--',color = 'gray', label = 'Original values',alpha=0.5)
-        
+        ax_.plot(lambdas,storical_backscattering_ph_NN,color = '#377eb8',label='SGVB')
+        ax_.plot(lambdas,original_values,'--',color = 'black', label = 'Original values',alpha=0.5)
         ax_.set_xticks(lambdas,['412.5','445.5','490','510','555'])
-        ax_.set_xlabel('Wavelenght [nm]',fontsize=10)
-        ax_.set_ylabel('$b_{b,PH}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=10)
-        ax_.tick_params(axis='y', labelsize=10)
-        ax_.tick_params(axis='x', labelsize=10)
+        ax_.set_xlabel('Wavelenght [nm]',fontsize=40)
+        ax_.set_ylabel('$b_{b,phy}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=40)
+        ax_.tick_params(axis='y', labelsize=35)
+        ax_.tick_params(axis='x', labelsize=35)
+
+        ax_.fill_between(lambdas, storical_backscattering_ph_mean - storical_backscattering_ph_std,\
+                         storical_backscattering_ph_mean + storical_backscattering_ph_std,color='#bfbfbf',zorder = 0.1,alpha=0.8,label='63% confidence interval')
+        ax_.plot(lambdas,storical_backscattering_ph_mean,color = 'gray',label = 'mcmc mean value')
 
         
-    fig, axs = plt.subplots(ncols = 3, nrows = 1,width_ratios = [1/3,1/3,1/3])
-    plot_track_absortion_ph(axs[0],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,400)
-    plot_track_scattering_ph(axs[1],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,400)
-    plot_track_backscattering_ph(axs[2],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,400)
+    fig, axs = plt.subplots(ncols = 3, nrows = 1,width_ratios = [1/3,1/3,1/3],layout='constrained',figsize=(30,15))
+    plot_track_absortion_ph(axs[0],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,perturbation_factors_mean,perturbation_factors_std)
+    plot_track_scattering_ph(axs[1],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,perturbation_factors_mean,perturbation_factors_std)
+    plot_track_backscattering_ph(axs[2],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,perturbation_factors_mean,perturbation_factors_std)
     
-    axs[0].text(-0.1,1.05,labs[0],transform = axs[0].transAxes,fontsize='20')
-    axs[1].text(-0.1,1.05,labs[1],transform = axs[1].transAxes,fontsize='20')
-    axs[2].text(-0.1,1.05,labs[2],transform = axs[2].transAxes,fontsize='20')
+    axs[0].text(-0.1,1.05,labs[0],transform = axs[0].transAxes,fontsize='40')
+    axs[1].text(-0.1,1.05,labs[1],transform = axs[1].transAxes,fontsize='40')
+    axs[2].text(-0.1,1.05,labs[2],transform = axs[2].transAxes,fontsize='40')
 
-    axs[0].legend()
-    axs[1].legend()
-    axs[2].legend()
+    axs[0].legend(fontsize="25")
+    axs[1].legend(fontsize="25")
+    axs[2].legend(fontsize="25")
 
-    plt.show()
+    plt.savefig(save_path + '/constant2.pdf')
 
         
-
-if __name__ == "__main__":
-
-    #comparison_alphas()
-
+def plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce',plots_path = MODEL_HOME + '/settings/reproduce/plots',results_name_timeline='results_VAE_VAEparam_chla',output_plot_prefix='_lognormal_VAEparam',perturbation_factors_path = HOME_PATH + '/settings/perturbation_factors',constants_path1=HOME_PATH+'/settings',constants_path2=HOME_PATH+'/settings'):
+    
+    #comparison_alphas(alphas_path = '/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/reproduce/alphas')
     #plt.close()
 
-    test_indexes,train_indexes = customTensorData(data_path=HOME_PATH + '/settings/npy_data',which='train',per_day = False,randomice=True,one_dimensional = True,seed = 1853).test_indexes,\
+    test_indexes,train_indexes = customTensorData(data_path=settings_npy_data_path,which='train',per_day = False,randomice=True,one_dimensional = True,seed = 1853).test_indexes,\
+        customTensorData(data_path=settings_npy_data_path,which='train',per_day = False,randomice=True,one_dimensional = True,seed = 1853).train_indexes
+
+    plot_chla(input_data_path = results_path + '/' +results_name_timeline,\
+              figname = plots_path + '/chla'+output_plot_prefix+'.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
+              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
+              third_data_path = results_path + '/results_VAE_VAEparam_chla',log_scale=True)
+
+    plot_kd(input_data_path = results_path + '/' + results_name_timeline,\
+              figname = plots_path + '/kd'+output_plot_prefix+'.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
+              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
+              third_data_path = results_path + '/results_VAE_VAEparam_chla',log_scale=True)
+
+    plot_bbp(input_data_path = results_path + '/' + results_name_timeline,\
+              figname = plots_path +'/bbp'+output_plot_prefix+'.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
+              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
+              third_data_path = results_path + '/results_VAE_VAEparam_chla',log_scale=True)
+    
+    plot_constants_2(perturbation_path = perturbation_factors_path,save_path =  plots_path,constants_path1=constants_path1)
+    
+
+def print_statistics(perturbation_factors_path= MODEL_HOME + '/settings/perturbation_factors',save_path=MODEL_HOME + '/settings/reproduce/plots',results_path = MODEL_HOME + '/settings/reproduce'):
+    
+    test_indexes,train_indexes = customTensorData(data_path=HOME_PATH + '/settings/npy_data',which='test',per_day = False,randomice=True,one_dimensional = True,seed = 1853).test_indexes,\
         customTensorData(data_path=HOME_PATH + '/settings/npy_data',which='train',per_day = False,randomice=True,one_dimensional = True,seed = 1853).train_indexes
 
 
-    plot_scaterplot(test_indexes,vae_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla')
 
-
-    plot_constants_1(vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')
-
-
-    plot_constants_2(vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')
+    #plot_scaterplot(test_indexes,vae_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla')
+    #plot_scaterplot(test_indexes,vae_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla')
+    #plot_constants_1(vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')
     
-    plot_chla(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam',\
-              figname = MODEL_HOME + '/experiments/chla_lognormal_data_chla_centered.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
-              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
-              third_data_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',log_scale=True)
-
-
-
-
-    plot_kd(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam',\
-            figname = MODEL_HOME + '/experiments/kd_lognormal_data_chla_centerd.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
-            statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[1e-2,0.31],figsize=(17,17),\
-            third_data_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',log_scale = True)
     
-
-
-    plot_bbp(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam',\
-             figname = MODEL_HOME + '/experiments/bbp_lognormal_data_chla_centerd.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
-             statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
-             third_data_path = MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',log_scale = True)
-
 
     data = data_dataframe(MODEL_HOME + '/settings/npy_data')
 
     data['NAP'] = np.nan
     data['CDOM'] = np.nan
-    second_run = read_second_run(MODEL_HOME + '/experiments/results_bayes_lognormal_mcmcParam',include_uncertainty=True,abr='log_output')
+    #second_run = read_second_run(MODEL_HOME + '/experiments/results_bayes_lognormal_mcmcParam',include_uncertainty=True,abr='log_output')
+    second_run = read_second_run(results_path + '/results_lognormal_mcmc',include_uncertainty=True,abr='log_output')
     data = second_run.merge(data,how='right',on='date')
-    second_run = read_second_run(MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam',include_uncertainty=True,abr='logNN_output')
+    #second_run = read_second_run(MODEL_HOME + '/experiments/results_bayes_lognormal_VAEparam',include_uncertainty=True,abr='logNN_output')
+    second_run = read_second_run(results_path + '/results_lognormal_VAEparam',include_uncertainty=True,abr='logNN_output')
     data = second_run.merge(data,how='right',on='date')
-    second_run = read_second_run(MODEL_HOME + '/experiments/results_bayes_lognormal_unperturbed',include_uncertainty=True,abr='un_output')
+    #second_run = read_second_run(MODEL_HOME + '/experiments/results_bayes_lognormal_unperturbed',include_uncertainty=True,abr='un_output')
+    second_run = read_second_run(results_path + '/results_unperturbed',include_uncertainty=True,abr='un_output')
     data = second_run.merge(data,how='right',on='date')
-    second_run = read_second_run(MODEL_HOME + '/experiments/results_NN_NNparam',include_uncertainty=False,abr='NN_output')
-    data = second_run.merge(data,how='right',on='date')
-    second_run = read_second_run(MODEL_HOME + '/settings/VAE_model/results_VAE_VAEparam_chla',include_uncertainty=True,abr='VAE_output')
+    #second_run = read_second_run(MODEL_HOME + '/experiments/results_NN_NNparam',include_uncertainty=False,abr='NN_output')
+    #data = second_run.merge(data,how='right',on='date')
+    second_run = read_second_run(results_path + '/results_VAE_VAEparam_chla',include_uncertainty=True,abr='VAE_output')
     data = second_run.merge(data,how='right',on='date')
     data.sort_values(by='date',inplace=True)
     del second_run
-
-    plt.close()
-
-
 
     lambdas_names = ['412','442','490','510','555']
     lambdas_values = ['412.5','442.5','490','510','555']
@@ -829,17 +839,19 @@ if __name__ == "__main__":
     def p_rmse(a,b,exp=False,value=False):
         data_a = data[a].iloc[test_indexes]
         data_b = data[b].iloc[test_indexes]
+
         if exp == True:
+            std = np.nanstd((data[a]))
             if value == True:
-                return np.sqrt( np.nanmean(     ((np.exp(data_a) - np.exp(data_b)))**2    ) )
+                return np.sqrt( np.nanmean(     (((data_a) - (data_b))/std)**2    ) )
             else:
-                                    
-                return  '{:.6f}'.format(np.sqrt( np.nanmean(     ((np.exp(data_a) - np.exp(data_b)))**2) ))
+                return  '{:.6f}'.format(np.sqrt( np.nanmean(     (((data_a) - (data_b))/std)**2) ))
         else:
+            std = np.nanstd(np.log(data[a]))
             if value == True:
-                return np.sqrt( np.nanmean(((data_a - data_b))**2) )
-            else:    
-                return  '{:.6f}'.format(np.sqrt( np.nanmean(((data_a - data_b))**2) ))
+                return np.sqrt( np.nanmean(((np.log(data_a) - np.log(data_b))/std)**2) )
+            else:
+                return  '{:.6f}'.format(np.sqrt( np.nanmean(((np.log(data_a) - np.log(data_b))/std)**2) ))
 
     def p_correlation(a,b,exp=False,value=False):
 
@@ -902,6 +914,32 @@ if __name__ == "__main__":
         print( 'Total &' , '&'.join(['{:.5f}'.format(t) for t in total]), '\\\\\\hline' )
         print('\n\n\n')
 
+
+    
+
+    
+if __name__ == "__main__":
+
+    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_name_timeline='/results_AM',output_plot_prefix='_lognormal_AM',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
+    
+    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_name_timeline='/results_unperturbed',output_plot_prefix='_lognormal_unperturbed',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
+    
+    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_name_timeline='/results_lognormal_mcmc',output_plot_prefix='_lognormal_mcmc',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
+    
+    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_name_timeline='/results_lognormal_VAEparam',output_plot_prefix='_lognormal_VAEparam',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
+
+
+    print_statistics(perturbation_factors_path= MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors',save_path=MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_path = MODEL_HOME + '/settings/reproduce_dukiewicz')
+
+
+    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce',plots_path = MODEL_HOME + '/settings/reproduce/plots',results_name_timeline='/results_unperturbed',output_plot_prefix='_lognormal_unperturbed',perturbation_factors_path = HOME_PATH + '/settings/reproduce/perturbation_factors',constants_path1 = MODEL_HOME + '/settings')
+    
+    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce',plots_path = MODEL_HOME + '/settings/reproduce/plots',results_name_timeline='/results_lognormal_mcmc',output_plot_prefix='_lognormal_mcmc',perturbation_factors_path = HOME_PATH + '/settings/reproduce/perturbation_factors',constants_path1 = MODEL_HOME + '/settings')
+    
+    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce',plots_path = MODEL_HOME + '/settings/reproduce/plots',results_name_timeline='/results_lognormal_VAEparam',output_plot_prefix='_lognormal_VAEparam',perturbation_factors_path = HOME_PATH + '/settings/reproduce/perturbation_factors',constants_path1 = MODEL_HOME + '/settings')
+
+
+    #print_statistics(perturbation_factors_path= MODEL_HOME + '/settings/reproduce/perturbation_factors',save_path=MODEL_HOME + '/settings/reproduce/plots',results_path = MODEL_HOME + '/settings/reproduce')
 
 
     

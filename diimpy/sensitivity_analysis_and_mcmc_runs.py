@@ -16,6 +16,7 @@ import matplotlib.colors as mcolors
 from diimpy.CVAE_model_part_two import NN_second_layer
 import os
 import sys
+from mpi4py import MPI
 
 if 'DIIM_PATH' in os.environ:
     MODEL_HOME = HOME_PATH =  os.environ["DIIM_PATH"]
@@ -117,24 +118,25 @@ def sensitivity_boxplot(jacobian_rrs,jacobian_kd,jacobian_bbp,rrs_hat,kd_hat,bbp
 
 class evaluate_model():
 
-    def __init__(self,data_path = MODEL_HOME + '/settings/npy_data',iterations=10, my_device = 'cpu'):
+    def __init__(self,data_path = MODEL_HOME + '/settings/npy_data',iterations=10, my_device = 'cpu',precision=torch.float32,constant=None):
 
-        self.data = customTensorData(data_path=data_path,which='train',per_day = False,randomice=False,seed=1853)
+        self.precision = precision
+        self.data = customTensorData(data_path=data_path,which='train',per_day = False,randomice=False,seed=1853,precision=self.precision)
         self.dates = self.data.dates
         self.my_device = 'cpu'
-    
-        self.constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',my_device = my_device)
+
+        self.constant=constant
     
         self.x_a = torch.zeros(3)
-        self.s_a = torch.eye(3)*100
+        self.s_a = torch.eye(3)*1.13
         self.s_e = (torch.eye(5)*torch.tensor([1.5e-3,1.2e-3,1e-3,8.6e-4,5.7e-4]))**(2)#validation rmse from https://catalogue.marine.copernicus.eu/documents/QUID/CMEMS-OC-QUID-009-141to144-151to154.pdf
 
         self.lr = 0.029853826189179603
         self.batch_size = self.data.len_data
         self.dataloader = DataLoader(self.data, batch_size=self.batch_size, shuffle=False)
-        self.model = Forward_Model(num_days=self.batch_size).to(my_device)
+        self.model = Forward_Model(num_days=self.batch_size,precision=self.precision).to(my_device)
 
-        self.loss = RRS_loss(self.x_a,self.s_a,self.s_e,num_days=self.batch_size,my_device = self.my_device)
+        self.loss = RRS_loss(self.x_a,self.s_a,self.s_e,num_days=self.batch_size,my_device = self.my_device,precision=self.precision)
         self.optimizer = torch.optim.Adam(self.model.parameters(),lr=self.lr)
         self.iterations = iterations
         self.X,self.Y = next(iter(self.dataloader))
@@ -154,6 +156,7 @@ class evaluate_model():
         loss.backward()
         self.optimizer.step()
         self.optimizer.zero_grad()
+        self.loss_iter = loss
         #self.scheduler.step(loss)
         
     def predict(self):
@@ -165,21 +168,21 @@ class evaluate_model():
         return self.model.state_dict()['chparam'].clone().detach()
     
 class mcmc_class():
-    def __init__(self,chla_hat,perturbation_factors = torch.ones(14),proposal_variance = 1,constant = None,num_iterations = 100):
-
-        self.current_position = perturbation_factors + torch.randn(14)*0.01
+    def __init__(self,chla_hat,perturbation_factors = torch.ones(14),proposal_variance = 1,constant = None,num_iterations = 100,precision=torch.float32):
+        
+        self.precision = precision
+        self.current_position = perturbation_factors + torch.randn(14)*0.05
         self.proposal_variance = proposal_variance
-        self.model = evaluate_model()
+        self.model = evaluate_model(precision=self.precision,constant=constant)
         self.X, self.Y_nan  = next(iter(self.model.dataloader))
         
         self.Y = torch.masked_fill(self.Y_nan,torch.isnan(self.Y_nan),0)
         self.model.model_parameters_update(self.current_position)
         self.model.model_chla_init(chla_hat)
-        self.model.iterations = 250
         self.model.predict()
-        self.model.iterations = 5
+        self.model.iterations = 200
         self.evaluate_model = evaluate_model_class(model = None,X = self.X[:,:,1:],constant = constant)
-        self.loss = OBS_loss()
+        self.loss = OBS_loss(precision=precision,normalization_values = torch.tensor(self.model.data.y_std))
 
         self.history = torch.empty((num_iterations,14))
 
@@ -197,6 +200,28 @@ class mcmc_class():
 
         loss = self.loss(self.Y,pred,self.Y_nan)
         return -(0.5)*loss*pred.shape[0]
+
+    def likelihood_profile(self,initial_perturbation_factors=None,perturbation_profiled=-1,values_profiled=np.linspace(0.1,1.9,200),iterations=100):
+        self.model.iterations = iterations
+        likelihood_profile = np.empty((values_profiled.shape[0],3))
+        if type(initial_perturbation_factors) != type(None):
+            self.current_position = initial_perturbation_factors
+            self.model.model_parameters_update(self.current_position)
+        
+        for k,profile in enumerate(values_profiled):
+            init_time = time.time()
+            self.current_position[perturbation_profiled] = profile
+            self.model.model_parameters_update(self.current_position)
+
+            self.model.predict()
+            
+            chla_current = self.model.return_chla()
+            likelihood_profile[k,0] = (self.likelihood(self.current_position,chla_current).clone().detach().numpy())
+            likelihood_profile[k,1] = likelihood_profile[k,0] -(0.5)*self.model.loss_iter
+            likelihood_profile[k,2] = likelihood_profile[k,1] - ((0.25)*(self.current_position - np.ones(14))**2).mean()
+            print(profile,likelihood_profile[k],init_time - time.time())
+            
+        return likelihood_profile
                 
     def step(self,iteration):
             
@@ -231,8 +256,7 @@ def saving_mcmc(input_):
         
     init_time = time.time()
     num_iterations = 3000
-
-    mcmc = mcmc_class(chla_hat,perturbation_factors = perturbation_factors,proposal_variance = 0.002,constant = constant,num_iterations = num_iterations)
+    mcmc = mcmc_class(chla_hat,perturbation_factors = perturbation_factors,proposal_variance = 0.002,constant = constant,num_iterations = num_iterations,precision=torch.float64)
             
     resulting_mcmc = list(map(mcmc.step,np.arange(num_iterations)))
         
@@ -240,108 +264,22 @@ def saving_mcmc(input_):
     np.save(output_path + '/run_' + str(j)+'.npy',mcmc.history.numpy())
     print(output_path + '/run_' + str(j)+'.npy saved, time', (time.time() - init_time) )
 
-
-def plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy'):
+def profiling_likelihood(perturbation_factors_path,constant_path1,constant_path2,chla_hat_path,output_path):
+    my_device = 'cpu'
+    precision = torch.float64
+    perturbation_factors = torch.tensor(np.load(perturbation_factors_path)).to(precision)
+    constant = read_constants(file1=constant_path1,file2=constant_path2,my_device = my_device,precision=precision)
+    chla_hat = np.load(chla_hat_path+'/X_hat.npy')
+    mu_z = torch.tensor(chla_hat[:,::2],dtype=precision)
+    train_labels = np.load(MODEL_HOME+'/settings/npy_data/train_labels.npy')
+    train_labels= np.sort(train_labels)
+    chla_hat = mu_z[train_labels].unsqueeze(1)
+    mcmc = mcmc_class(chla_hat,perturbation_factors = perturbation_factors,proposal_variance = 0.002,constant = constant,num_iterations = 1000,precision=torch.float64)
+    likelihood_profile = mcmc.likelihood_profile(initial_perturbation_factors=perturbation_factors,perturbation_profiled=-1,values_profiled=np.linspace(0.1,1.9,100),iterations=500)
+    np.save(output_path,likelihood_profile)
     
-    perturbation_factors_history_NN = np.load(perturbation_path + '/'+vae_name)[-300:].mean(axis=1)
-    perturbation_factors_history_lognormal =np.load(perturbation_path + '/perturbation_factors_history_AM_final.npy')[-1]
-    perturbation_factors_mean = np.load(perturbation_path + '/perturbation_factors_mean_mcmc.npy')
-    perturbation_factors_std = np.load(perturbation_path + '/perturbation_factors_std_mcmc.npy')
-    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',dict=True)
-
-    labs = ['(a)','(b)','(c)']
-
-    def plot_track_absortion_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,perturbation_factors_mean,perturbation_factors_std,cmap = plt.cm.Blues):
-
-        lambdas = np.array([412.5,442.5,490,510,555])
-        original_values = constant['absortion_PH'].numpy()
-        storical_absortion_ph_NN =    past_perturbation_factors_NN[0]*(constant['absortion_PH'].numpy())
-        storical_absortion_ph_lognormal =    past_perturbation_factors_lognormal[0]*(constant['absortion_PH'].numpy())
-        storical_absortion_ph_mean =    perturbation_factors_mean[0]*(constant['absortion_PH'].numpy())
-        storical_absortion_ph_std =    perturbation_factors_std[0]*(constant['absortion_PH'].numpy())
-
-        ax_.plot(lambdas,storical_absortion_ph_NN,color = '#377eb8',label = 'SGVB')
-        ax_.plot(lambdas,original_values,'--',color = 'black', label = 'Original values',alpha=0.5)
-        ax_.set_xticks(lambdas,['412.5','442.5','490','510','555'])
-        ax_.set_xlabel('Wavelenght [nm]',fontsize=20)
-        ax_.set_ylabel('$a_{phy}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=20)
-        ax_.tick_params(axis='y', labelsize=20)
-        ax_.tick_params(axis='x', labelsize=20)
-
-        ax_.fill_between(lambdas, storical_absortion_ph_mean - storical_absortion_ph_std, \
-                         storical_absortion_ph_mean + storical_absortion_ph_std,color='#bfbfbf',zorder = 0.1,alpha=0.8,label='63% confidence interval')
-        ax_.plot(lambdas,storical_absortion_ph_mean,color = 'gray',label = 'mcmc mean value')
     
-
-
-    def plot_track_scattering_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,perturbation_factors_mean,perturbation_factors_std, cmap = plt.cm.Blues):
-
-        lambdas = np.array([412.5,442.5,490,510,555])
-        #print(constant)
-        original_values = constant['linear_regression_slope_s']*lambdas + (constant['linear_regression_intercept_s'])
-        storical_scattering_ph_NN =   past_perturbation_factors_NN[1]*(constant['linear_regression_slope_s'])*lambdas\
-                                   +   past_perturbation_factors_NN[2]*(constant['linear_regression_intercept_s'])
-        storical_scattering_ph_lognormal =   past_perturbation_factors_lognormal[1]*(constant['linear_regression_slope_s'])*lambdas\
-                                   +   past_perturbation_factors_lognormal[2]*(constant['linear_regression_intercept_s'])
-        storical_scattering_ph_mean =   perturbation_factors_mean[1]*(constant['linear_regression_slope_s'])*lambdas\
-                                   +   perturbation_factors_mean[2]*(constant['linear_regression_intercept_s'])
-        storical_scattering_ph_std =   perturbation_factors_std[1]*(constant['linear_regression_slope_s'])*lambdas\
-                                   +   perturbation_factors_std[2]*(constant['linear_regression_intercept_s'])
-
-        ax_.plot(lambdas,storical_scattering_ph_NN,color = '#377eb8',label='SGVB')
-        ax_.plot(lambdas,original_values,'--',color = 'black', label = 'Original values',alpha=0.5)
-        ax_.set_xticks(lambdas,['412.5','445.5','490','510','555'])
-        ax_.set_xlabel('Wavelenght [nm]',fontsize=20)
-        ax_.set_ylabel('$b_{phy}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=20)
-        ax_.tick_params(axis='y', labelsize=20)
-        ax_.tick_params(axis='x', labelsize=20)
-
-        ax_.fill_between(lambdas, storical_scattering_ph_mean - storical_scattering_ph_std,\
-                         storical_scattering_ph_mean + storical_scattering_ph_std,color='#bfbfbf',zorder = 0.1,alpha=0.8,label='63% confidence interval')
-        ax_.plot(lambdas,storical_scattering_ph_mean,color = 'gray',label = 'mcmc mean value')
     
-    def plot_track_backscattering_ph(ax_,constant,past_perturbation_factors_NN, past_perturbation_factors_lognormal,perturbation_factors_mean,perturbation_factors_std,cmap = plt.cm.Blues):
-
-        lambdas = np.array([412.5,442.5,490,510,555])
-        #print(constant)
-        original_values = constant['linear_regression_slope_b']*lambdas + (constant['linear_regression_intercept_b'])
-        storical_backscattering_ph_NN =   past_perturbation_factors_NN[3]*(constant['linear_regression_slope_b'])*lambdas\
-                                   +   past_perturbation_factors_NN[4]*(constant['linear_regression_intercept_b'])
-        storical_backscattering_ph_lognormal =   past_perturbation_factors_lognormal[3]*(constant['linear_regression_slope_b'])*lambdas\
-                                   +   past_perturbation_factors_lognormal[4]*(constant['linear_regression_intercept_b'])
-        storical_backscattering_ph_mean =   perturbation_factors_mean[3]*(constant['linear_regression_slope_b'])*lambdas\
-                                   +   perturbation_factors_mean[4]*(constant['linear_regression_intercept_b'])
-        storical_backscattering_ph_std =   perturbation_factors_std[3]*(constant['linear_regression_slope_b'])*lambdas\
-                                   +   perturbation_factors_std[4]*(constant['linear_regression_intercept_b'])
-
-        ax_.plot(lambdas,storical_backscattering_ph_NN,color = '#377eb8',label='SGVB')
-        ax_.plot(lambdas,original_values,'--',color = 'black', label = 'Original values',alpha=0.5)
-        ax_.set_xticks(lambdas,['412.5','445.5','490','510','555'])
-        ax_.set_xlabel('Wavelenght [nm]',fontsize=20)
-        ax_.set_ylabel('$b_{b,phy}$ $[\mathrm{m}^2\mathrm{(mgChl)}^{-1}]$',fontsize=20)
-        ax_.tick_params(axis='y', labelsize=20)
-        ax_.tick_params(axis='x', labelsize=20)
-
-        ax_.fill_between(lambdas, storical_backscattering_ph_mean - storical_backscattering_ph_std,\
-                         storical_backscattering_ph_mean + storical_backscattering_ph_std,color='#bfbfbf',zorder = 0.1,alpha=0.8,label='63% confidence interval')
-        ax_.plot(lambdas,storical_backscattering_ph_mean,color = 'gray',label = 'mcmc mean value')
-
-        
-    fig, axs = plt.subplots(ncols = 3, nrows = 1,width_ratios = [1/3,1/3,1/3],layout='constrained')
-    plot_track_absortion_ph(axs[0],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,perturbation_factors_mean,perturbation_factors_std)
-    plot_track_scattering_ph(axs[1],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,perturbation_factors_mean,perturbation_factors_std)
-    plot_track_backscattering_ph(axs[2],constant,perturbation_factors_history_NN,perturbation_factors_history_lognormal,perturbation_factors_mean,perturbation_factors_std)
-    
-    axs[0].text(-0.1,1.05,labs[0],transform = axs[0].transAxes,fontsize='20')
-    axs[1].text(-0.1,1.05,labs[1],transform = axs[1].transAxes,fontsize='20')
-    axs[2].text(-0.1,1.05,labs[2],transform = axs[2].transAxes,fontsize='20')
-
-    axs[0].legend(fontsize="15")
-    axs[1].legend(fontsize="15")
-    axs[2].legend(fontsize="15")
-
-    plt.show()
-
 def correlation_matrix(num_runs,mcmc_runs,plot=True,table=False):
     correlation_lenght_use = 0
     for which in range(14):
@@ -352,11 +290,11 @@ def correlation_matrix(num_runs,mcmc_runs,plot=True,table=False):
         correlation = np.mean(correlation,axis=0)
 
         for correlation_lenght in range(500):
-            if correlation[correlation_lenght]<0.4:
+            if correlation[correlation_lenght]<0.2:
                 break
         if correlation_lenght > correlation_lenght_use:
             correlation_lenght_use = correlation_lenght
-    
+    print(correlation_lenght)
     data = mcmc_runs[:,::correlation_lenght,:]
 
     mcmc_runs_ = np.empty((280,14))
@@ -403,10 +341,10 @@ def autocorr(x,lags):
         corr = [1. if np.isnan(c) else c for c in corr ] #worst case scenario, they are correlated. 
         return np.array(corr)
 
-def parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False,constant_values=None,perturbation_factors = None,perturbation_factors_NN = None,fig_labels = None):
+def parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=False,constant_values=None,perturbation_factors = None,perturbation_factors_NN = None,fig_labels = None,perturbation_factors_NN_std = None,plots_path = MODEL_HOME + '/settings/reproduce/plots'):
 
     if plot==True:
-        fig,axs = plt.subplots(ncols=3,nrows=3,layout='constrained')
+        fig,axs = plt.subplots(ncols=3,nrows=3,layout='constrained',figsize=(30,20))
         for which,ax in enumerate(axs.flatten()):
 
             data = mcmc_runs[:,::correlation_lenght,which].flatten()
@@ -435,7 +373,7 @@ def parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=T
             ax.tick_params(axis='x', labelsize=15)
             ax.set_xlim((x_lims[0] - (x_lims[1] - x_lims[0] )*0.3,x_lims[1]))
             ax.legend(fontsize="10")
-        plt.show()
+        plt.savefig(plots_path + '/mcmc_parameter_statistics.pdf')
     if table == True:
         mu = np.empty(9)
         sigma = np.empty(9)
@@ -451,123 +389,72 @@ def parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=T
             
         statistics = ['Original value','CVAE result','MCMC result','KS test for normality','KS p-value for normality']
         print("&" + "&".join(statistics) + '\\\\\\hline')
-
         for which in range(len(names)):
-            print( names[which] + "&" + "{:.4f}&{:.4f} &{:.4f} $\\pm$ {:.4f}&{:.4f}&{:.4f}\\\\".format(constant_values[which],\
-                                                                                                                 constant_values[which]*perturbation_factors_NN[5+which],\
-                                                                                                                 mu[which] ,\
-                                                                                                                 sigma[which] ,\
-                                                                                                                 ks_value[which] ,\
-                                                                                                               ks_pvalue[which]))
+            print( names[which] + "&" + "{:.4f}&{:.4f} &{:.4f} $\\pm$ {:.4f}&{:.4f}&{:.3E}\\\\".\
+                   format(constant_values[which],\
+                          constant_values[which]*perturbation_factors_NN[5+which],\
+                          mu[which] ,\
+                          sigma[which] ,\
+                          ks_value[which] ,\
+                          ks_pvalue[which]))
 
 
-def mcmc(output_path = MODEL_HOME + '/experiments/mcmc/'):
+def mcmc(output_path = MODEL_HOME + '/experiments/mcmc', perturbation_factors_path = MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy',constant_path1 = MODEL_HOME + '/settings/cte_lambda.csv',constant_path2=MODEL_HOME + '/settings/cte.csv',chla_hat_path = MODEL_HOME+'/settings/reproduce/results_AM',rank=0,nranks=1):
     my_device = 'cpu'
-    precision = torch.float32
-    perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
-    constant = read_constants(file1=MODEL_HOME + '/settings/cte_lambda.csv',file2=MODEL_HOME + '/settings/cte.csv',my_device = my_device)
+    precision = torch.float64
+    perturbation_factors = torch.tensor(np.load(perturbation_factors_path)[-1]).to(precision)
+    constant = read_constants(file1=constant_path1,file2=constant_path2,my_device = my_device,precision=precision)
 
-    best_result_config = torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_final_config.pt')
+    chla_hat = np.load(chla_hat_path+'/X_hat.npy')
     
-    number_hiden_layers_mean = best_result_config['number_hiden_layers_mean']
-    dim_hiden_layers_mean = best_result_config['dim_hiden_layers_mean']
-    dim_last_hiden_layer_mean = best_result_config['dim_last_hiden_layer_mean']
-    alpha_mean = best_result_config['alpha_mean']
-    number_hiden_layers_cov = best_result_config['number_hiden_layers_cov']
-    dim_hiden_layers_cov = best_result_config['dim_hiden_layers_cov']
-    dim_last_hiden_layer_cov = best_result_config['dim_last_hiden_layer_cov']
-    alpha_cov = best_result_config['alpha_cov']
-    x_mul = torch.tensor(best_result_config['x_mul']).to(precision).to(my_device)
-    x_add = torch.tensor(best_result_config['x_add']).to(precision).to(my_device)
-    y_mul = torch.tensor(best_result_config['y_mul']).to(precision).to(my_device)
-    y_add = torch.tensor(best_result_config['y_add']).to(precision).to(my_device)
-
-    model_NN = NN_second_layer(output_layer_size_mean=3,number_hiden_layers_mean = number_hiden_layers_mean,\
-                           dim_hiden_layers_mean = dim_hiden_layers_mean,alpha_mean=alpha_mean,dim_last_hiden_layer_mean = dim_last_hiden_layer_mean,\
-                           number_hiden_layers_cov = number_hiden_layers_cov,\
-                           dim_hiden_layers_cov = dim_hiden_layers_cov,alpha_cov=alpha_cov,dim_last_hiden_layer_cov = dim_last_hiden_layer_cov,x_mul=x_mul,x_add=x_add,\
-                           y_mul=y_mul,y_add=y_add,constant = constant,model_dir = MODEL_HOME + '/settings/VAE_model').to(my_device)
-
-    
-    model_NN.load_state_dict(torch.load(MODEL_HOME + '/settings/VAE_model/model_second_part_chla_centered.pt'))
-    model_NN.eval()
-
-    data = customTensorData(data_path=MODEL_HOME + '/settings/npy_data',which='train',per_day = False,randomice=False,one_dimensional = True,seed = 1853,device=my_device,normilized_NN='scaling')
-    
-    X,Y = next(iter(DataLoader(data, batch_size=data.len_data, shuffle=False)))
-
-    z_hat,cov_z,mu_z,kd_hat,bbp_hat,rrs_hat = model_NN(X) #we are working with \lambda as imput, but the NN dosent use it. 
-    mu_z = mu_z* model_NN.y_mul[0] + model_NN.y_add[0]
-    list(map(saving_mcmc,[(j,perturbation_factors,constant,mu_z.unsqueeze(1),output_path) for j in range(20)]))
+    mu_z = torch.tensor(chla_hat[:,::2],dtype=precision)
+    train_labels = np.load(MODEL_HOME+'/settings/npy_data/train_labels.npy')
+    train_labels= np.sort(train_labels)
+    mu_z = mu_z[train_labels]
+    for j in range(rank,40,nranks):
+        torch.manual_seed(j)
+        saving_mcmc((j,perturbation_factors,constant,mu_z.unsqueeze(1),output_path))
+    #list(map(saving_mcmc,[(j,perturbation_factors,constant,mu_z.unsqueeze(1),output_path) for j in range(40)]))
                 
 
-
-if __name__ == '__main__':
-
-
-    #mcmc()
+def analize_mcmc_result(perturbation_factors_path=MODEL_HOME + '/settings/reproduce/perturbation_factors',results_path = MODEL_HOME+'/settings/reproduce',constant_path1 = MODEL_HOME+'/settings',constant_path2 = MODEL_HOME+'/settings' ,mcmc_runs_path = MODEL_HOME + '/settings/reproduce/mcmc',plots_path = MODEL_HOME + '/settings/reproduce/plots'):
     
     data_dir = MODEL_HOME + '/settings/npy_data'
 
     my_device = 'cpu'
+    precision = torch.float64
     
-    constant = read_constants(file1=data_dir + '/../cte_lambda.csv',file2=data_dir+'/../cte.csv',my_device = my_device)
-    data = customTensorData(data_path=data_dir,which='all',per_day = True,randomice=False,one_dimensional = False,seed = 1853,device=my_device)
-    dataloader = DataLoader(data, batch_size=len(data.x_data), shuffle=False)
-
-    chla_hat = np.load( MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/X_hat.npy')
-    kd_hat = np.load(MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/kd_hat.npy')[:,[0,2,4,6,8]]
-    bbp_hat = np.load(MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/bbp_hat.npy')[:,[0,2,4]]
-    rrs_hat = np.load(MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/RRS_hat.npy')
-    
-    mu_z = torch.tensor(chla_hat[:,[0,2,4]]).unsqueeze(1)
-
-    X,Y = next(iter(dataloader))
-
-
-    model = Forward_Model(num_days=1,learning_chla = False,learning_perturbation_factors = False).to(my_device)
-    perturbation_factors = torch.ones(14)
-    
-    #jacobian_rrs,jacobian_kd,jacobian_bbp = compute_jacobians(model,X,mu_z,perturbation_factors,constant=constant) 
-
-    jacobian_rrs = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_rrs_initialparam_lognormalresults.npy')) #drrs/depsiloni
-    jacobian_kd = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_kd_initialparam_lognormalresults.npy'))
-    jacobian_bbp = np.abs(np.load(MODEL_HOME + '/settings/Jacobians/jacobian_bbp_initialparam_lognormalresults.npy'))
-
-    chla_hat = np.load( MODEL_HOME + '/experiments/results_bayes_lognormal_unperturbed/X_hat.npy')
-    kd_hat = np.load(MODEL_HOME + '/experiments/results_bayes_lognormal_unperturbed/kd_hat.npy')[:,[0,2,4,6,8]]
-    bbp_hat = np.load(MODEL_HOME + '/experiments/results_bayes_lognormal_unperturbed/bbp_hat.npy')[:,[0,2,4]]
-    rrs_hat = np.load(MODEL_HOME + '/experiments/results_bayes_lognormal_unperturbed/RRS_hat.npy')
-
-    perturbation_factors = torch.ones(14)
-    sensitivity_boxplot(jacobian_rrs,jacobian_kd,jacobian_bbp,rrs_hat,kd_hat,bbp_hat,perturbation_factors,X,\
-                            title='Sensitivity of the parameters with the literature values')
-
-
-    ################MCMC#############
     indexes = customTensorData(data_path=data_dir,which='all',per_day = True,randomice=True,one_dimensional = False,seed = 1853,device=my_device).train_indexes
-    perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
-    perturbation_factors_NN = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_CVAE_final.npy')[-1]).to(torch.float32)
-    perturbation_factors_NN = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(torch.float32).mean(axis=0)
-    perturbation_factors_NN_std = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(torch.float32).std(axis=0)
-    chla_hat = torch.tensor(np.load( MODEL_HOME + '/experiments/results_bayes_lognormal_logparam/X_hat.npy')[:,[0,2,4]]).to(torch.float32).unsqueeze(1)[indexes]
+    #perturbation_factors = torch.tensor(np.load(MODEL_HOME + '/settings/perturbation_factors/perturbation_factors_history_AM_test.npy')[-1]).to(torch.float32)
+    perturbation_factors = torch.tensor(np.load(perturbation_factors_path + '/perturbation_factors_history_loss_normilized.npy')[-1]).to(precision)
 
-    constant = read_constants(file1=data_dir + '/../cte_lambda.csv',file2=data_dir+'/../cte.csv',my_device = my_device,dict=True)
+    perturbation_factors_NN = torch.tensor(np.load(perturbation_factors_path + '/perturbation_factors_history_CVAE_chla_centered.npy')[-500:]).to(torch.float32).mean(axis=0)
+    perturbation_factors_NN_std = torch.tensor(np.load(perturbation_factors_path + '/perturbation_factors_history_CVAE_chla_centered.npy')[-300:]).to(torch.float32).std(axis=0)
+
+    chla_hat = torch.tensor(np.load(results_path + '/results_AM/X_hat.npy'),dtype=precision)[:,::2].unsqueeze(1)[indexes]
+
+    constant = read_constants(file1=constant_path2 + '/cte_lambda.csv',file2=constant_path2 + '/cte.csv',my_device = my_device,dict=True,precision=precision)
     constant_values = np.array([constant['dCDOM'],constant['sCDOM'],5.33,0.45,constant['Theta_min'],constant['Theta_o'],constant['beta'],constant['sigma'],0.005])
-
-
-    
+   
     num_runs = 40
     mcmc_runs = np.empty((num_runs,3000,14))
 
-
     for i in range(num_runs):
-        mcmc_runs[i] = np.load(MODEL_HOME + '/experiments/mcmc/run_' + str(i)+'.npy')
+        mcmc_runs[i] = np.load(mcmc_runs_path + '/run_' + str(i)+'.npy')
+        
+    correlation_matrix(num_runs,mcmc_runs,plot=False,table=True)
 
+    
     #mcmc_runs = mcmc_runs[:,2000:,:]
-    perturbation_factors_mcmc = np.reshape(mcmc_runs[:,2000::280,:],(mcmc_runs[:,2000::280,:].shape[0]*mcmc_runs[:,2000::280,:].shape[1],14)).mean(axis=0)
+    perturbation_factors_mcmc = np.reshape(mcmc_runs[:,1500::499,:],(mcmc_runs[:,1500::499,:].shape[0]*mcmc_runs[:,1500::499,:].shape[1],14))
+    
+    np.save(perturbation_factors_path + '/perturbation_factors_mcmc_std.npy',perturbation_factors_mcmc.std(axis=0))
+    np.save( perturbation_factors_path + '/perturbation_factors_mcmc_mean.npy',perturbation_factors_mcmc.mean(axis=0))
+    perturbation_factors_mcmc = perturbation_factors_mcmc.mean(axis=0)
+    
 
-    #correlation_matrix(num_runs,mcmc_runs,plot=False,table=False)
+
+    #correlation_matrix(num_runs,mcmc_runs,plot=False,table=True)
 
     mcmc_runs = mcmc_runs[:,:,5:] * constant_values
 
@@ -582,8 +469,8 @@ if __name__ == '__main__':
     fig_labels = ['(a)','(b)','(c)','(d)','(e)','(f)','(g)','(h)','(i)']
     names = ['$d_{\mathrm{CDOM}}$ [$\mathrm{m}^2(\mathrm{mgCDOM})^{-1}$]','$S_{\mathrm{CDOM}}$ [nm]','$Q_a$','$Q_b$',\
              '$\Theta^{\mathrm{min}}_{\mathrm{chla}}$ [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]','$\Theta^{\mathrm{0}}_{\mathrm{chla}}$  [$\mathrm{mgChla}\mathrm{(mgC)}^{-1}$]',\
-             '$\\beta$ [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$\sigma$  [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$b_{b,\mathrm{NAP}}$']
-    which = 3
+             '$\\beta$ [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$\sigma$  [$\mathrm{mmol}\mathrm{m}^{-2}\mathrm{s}^{-1}$]','$b_{r,\mathrm{NAP}}$']
+    which = 4
     fig,axs = plt.subplots(ncols=2,nrows=1,layout='constrained',width_ratios=[3/4,1/4])
 
     axs[0].axhline( y = constant_values[which],linestyle='--',label='original value',color='black')
@@ -628,14 +515,32 @@ if __name__ == '__main__':
 
     axs[1].set_yticks([])
     axs[0].set_ylim(*axs[1].get_ylim())
-    plt.show()
+    plt.savefig(plots_path + '/mcmc_example.pdf')
     plt.close()
+
     mcmc_runs = mcmc_runs[:,2000:,:]
 
     print(mcmc_runs.shape)
 
 
-    parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=True,constant_values=constant_values,perturbation_factors = perturbation_factors_mcmc,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels)
+    parameters_statistics(num_runs,mcmc_runs,names,correlation_lenght=280,plot=True,table=True,constant_values=constant_values,perturbation_factors = perturbation_factors_mcmc,perturbation_factors_NN = perturbation_factors_NN,fig_labels=fig_labels,perturbation_factors_NN_std = perturbation_factors_NN_std,plots_path = plots_path)
     
-    plot_constants_2(perturbation_path = MODEL_HOME + '/settings/perturbation_factors',vae_name = 'perturbation_factors_history_CVAE_chla_centered.npy')
-            
+
+if __name__ == '__main__':
+    torch.set_num_threads(1)
+    
+    #profiling_likelihood(perturbation_factors_path = MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors/perturbation_factors_mcmc_mean.npy',constant_path1=MODEL_HOME+'/settings/cte_lambda_dukiewicz/cte_lambda.csv',constant_path2=MODEL_HOME+'/settings/cte.csv',chla_hat_path = MODEL_HOME+'/settings/reproduce_dukiewicz/results_AM',output_path=MODEL_HOME + '/settings/reproduce_dukiewicz/plots/likelihood_profile.npy')
+    #sys.exit()
+    
+    #sys.exit()
+    #mcmc(output_path = MODEL_HOME + '/settings/reproduce/mcmc/', perturbation_factors_path = MODEL_HOME + '/settings/reproduce/perturbation_factors/perturbation_factors_history_loss_normilized.npy',constant_path1 = MODEL_HOME + '/settings/cte_lambda.csv',constant_path2=MODEL_HOME + '/settings/cte.csv',chla_hat_path = MODEL_HOME+'/settings/reproduce/results_AM')
+    comm = MPI.COMM_WORLD
+    rank  = comm.Get_rank()
+    nranks = comm.size
+    
+    #mcmc(output_path = MODEL_HOME + '/settings/reproduce_dukiewicz/mcmc/', perturbation_factors_path = MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors/perturbation_factors_history_loss_normilized.npy',constant_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz/cte_lambda.csv',constant_path2=MODEL_HOME + '/settings/cte.csv',chla_hat_path = MODEL_HOME+'/settings/reproduce_dukiewicz/results_AM',rank=rank,nranks=nranks)
+    comm.Barrier()
+    if rank == 0:
+
+        analize_mcmc_result(perturbation_factors_path=MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors',results_path = MODEL_HOME+'/settings/reproduce_dukiewicz',constant_path1 = MODEL_HOME+'/settings/cte_lambda_dukiewicz',constant_path2 = MODEL_HOME+'/settings' ,mcmc_runs_path = MODEL_HOME + '/settings/reproduce_dukiewicz/mcmc',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots')
+    #analize_mcmc_result(perturbation_factors_path=MODEL_HOME + '/settings/reproduce/perturbation_factors',results_path = MODEL_HOME+'/settings/reproduce',constant_path1 = MODEL_HOME+'/settings',constant_path2 = MODEL_HOME+'/settings' ,mcmc_runs_path = MODEL_HOME + '/settings/reproduce/mcmc',plots_path = MODEL_HOME + '/settings/reproduce/plots')

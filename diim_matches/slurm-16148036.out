@@ -1,0 +1,4 @@
+Loading openmpi/4.1.6--gcc--12.2.0
+  ERROR: Conflicting 'openmpi' is loaded
+Tue May  6 15:05:49 CEST 2025
+slurmstepd: error: *** JOB 16148036 ON r515c06n03 CANCELLED AT 2025-05-06T15:07:13 ***

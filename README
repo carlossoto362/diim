@@ -21,8 +21,14 @@ For automatic installation, a Darwin or Linux prompt with pip installed is requi
 ##################################### HOW TO INSTALL DIIM ###################################
 #############################################################################################
 
+###########
+#Minimal installation with pip
+###########
 A Makefile has been tested with Python 3.8.9, Python 3.9.6, and Python 3.12.7.
-It creates a virtual environment with all the Python 3 libraries and adds the path to diim,
+Make sure the "make" command works by writing in the terminal, 
+	$make -v
+If it returns the version, it works, and then you can procede to use the makefile to install
+diim. It creates a virtual environment with all the Python 3 libraries and adds the path to diim,
 as well as the diim environment, to $SHRC (.bashrc or .zshrc):
      $ make
      $ source $HOME/$SHRC
@@ -32,10 +38,21 @@ To add the python version you want to use, add
 
      $make PYTHON_VERSION=python3.8
 
+#############
+#Minimal installation with conda
+##############
+
 If, for some reason, the Makefile is not an option (e.g., you are using conda to install
-the dependencies), you must ensure that all required libraries are installed, as listed
-in the requirements.txt file, along with the libraries networkx >= 2.8.8, torch, torchvision,
-and torchaudio. You also need to set a global variable as:
+the dependencies), since the make file was done thinking in an instalation with pip,
+ you will have to ensure that all required libraries are installed, as listed
+in the requirements.txt file, along with the libraries networkx >= 2.8.8 and torch.
+
+For this end, we included a .yml file, so you can first, ensure you have conda install, 
+and then running, 
+	$conda env create -f environment.yml
+	$conda activate diim_env
+
+You also need to set a global variable as:
 
 	$ export DIIM_PATH=/path/to/DIIM
 
@@ -62,6 +79,21 @@ For completeness, I list here the libraries required for all the scripts to work
     tqdm>=4.66.5
     pyarrow
     tensorboardX
+
+##############
+#optional installations
+##############
+Not necesary to reproduce the results from the paper, but necessary if you are using some of
+the codes in the branch origin/maps, since it uses the OASIM library, and bit.sea. If you 
+are using a pip installation, make sure you have "cmake" install, and then, the minimal
+installation should do the trick. If conda is being used, follow the minimall installation with
+conda instructions, then go to ./extern/bit.sea and ./extern/OASIM_ATM, and follow the
+independent instructions to install each submodule (since they are submodules, you shoul have
+clone the repository with recursive-submodules flag). 
+
+The OASIM library creates files the file ./extern/OASIM_ATM/builds/$installation_used/OASIMlib/liboasim-py.so
+which is required to run the OASIM library in python. Copy that file in ./map/oasim_map/ 
+and all the scripts should run correctly. 
 
 #############################################################################################
 ################################# HOW TO TEST AND REPRODUCE #################################
@@ -183,4 +215,28 @@ The folder settings contains all the necessary files to run the codes in diimpy:
     parameters. The lambda-dependent parameters are in cte_lambda.csv, while the
     lambda-independent parameters are in cte.csv.
 
+
+########## !!!!!!!!IMPORTANT!!!!!!!!!###########
+#Aditional files added in the second version
+################################################
+All the results where reproduced, with the cte_lambda.csv changed (using values from dukiewicz et al).
+The parameters from dukiewicz et al are in cte_lambda_dukiewicz/cte_lambda.csv.
+
+All the results reproduced with this new set of parameters are in reproduce_dukiewicz/
+
+Only the first part of the Neural Network train only with the in-situ measurements, 
+and the hyper parameters for the second part of the Neural Network are unchanged, stored
+in settings/VAE_model, all the rest is under the folder reproduce_dukiewicz/VAE_model. 
+
+The folder ./settings/reproduce/ is added such that the file reproduce.py creates new vertions of all 
+the results and stores them there, without changing the final results in ./settings/reproduce_dukiewicz/ 
+
+The folder ./diim_matches/ has the codes used to make the comparison with in-situ measurements from cruses
+this data is available in zenodo, doi: https://doi.org/10.5281/zenodo.15489967. For this end, I needed
+to run the OASIM model, whos imput is Atmosferic data, downloaded from the ERA-5 (description in 
+Lazzari 2019, see references of the paper). Since the data set is stored in Cineca, and i had acces at the
+moment of this process, i didnt included the data in the github or zenodo. But a description of the data
+needed to run the scripts is in the documentation of oasim_map.py and diim_map.py in ./diimpy.
+Finaly, the data for the points that have matches with satellite Remote Sensing Reflectance are stored in
+.npy files in diim_matches, and can be plot by runing generate_matches.py.
 

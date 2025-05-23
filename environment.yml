@@ -24,3 +24,4 @@ dependencies:
  - numba
  - scikit-learn
  - geopy
+ - torch --index-url https://download.pytorch.org/whl/cpu

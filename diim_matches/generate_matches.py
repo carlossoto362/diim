@@ -123,15 +123,15 @@ def save_matches(save=True):
     dates = np.ma.array(dates,mask=chla_data.mask)
 
     if save == True:
-        np.save('dates.npy',dates.data)
-        np.save('rrs_subsampled.npy',rrs_subsampled.data)
-        np.save('lats.npy',lats.data)
-        np.save('lons.npy',lons.data)
-        np.save('chla_data.npy',chla_data.data)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/dates.npy',dates.data)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/rrs_subsampled.npy',rrs_subsampled.data)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/lats.npy',lats.data)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/lons.npy',lons.data)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_data.npy',chla_data.data)
 
-        np.save('rrs_std.npy',rrs_std.data)
-        np.save('chla_mask.npy',chla_data.mask)
-        np.save('rrs_mask.npy',rrs_subsampled.mask)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/rrs_std.npy',rrs_std.data)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_mask.npy',chla_data.mask)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/rrs_mask.npy',rrs_subsampled.mask)
         
     return dates.data,rrs_subsampled.data,lats.data,lons.data,chla_data.data,rrs_std.data,chla_data.mask,rrs_subsampled.mask
 
@@ -298,9 +298,9 @@ def diim_list(rrs,par,zenith,edif,edir,wl,times,lons,lats,constant=None,my_preci
             #print('communication received from rank {}, corresponding to elements from {} to {}'.format(rank_of_worker_sender,batch_size*i,batch_size*i + len_batch))
             
     if (rank == 0) & (save == True):
-        np.save('chla_NN.npy',chla_NN_rec)
-        np.save('chla_log.npy',chla_log_rec)
-        np.save('RRS_log.npy',RRS_log_rec)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_NN.npy',chla_NN_rec)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_log.npy',chla_log_rec)
+        np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/RRS_log.npy',RRS_log_rec)
         return dataset,chla_NN_rec,chla_log_rec,RRS_log_rec
 
 
@@ -309,7 +309,11 @@ def diim_list(rrs,par,zenith,edif,edir,wl,times,lons,lats,constant=None,my_preci
 
 
 def generate_oasim_list(dates_start,dates_end,lats,lons,rank=0,nranks=1,save=False,read=False,data_path = './',prefix=''):
-
+    if read == True:
+        edout = np.load(data_path + '/' + prefix + '_edout.npy')
+        esout = np.load(data_path + '/' + prefix + '_esout.npy') 
+        return edout,esout
+    
     dateformat = '%Y%m%d-%H:%M:%S'
     aerosol_datadir = '/g100_work/OGS_devC/NECCTON/OPTICS'
     cloud_datadir = '/g100_work/OGS_devC/NECCTON/OPTICS'
@@ -328,12 +332,7 @@ def generate_oasim_list(dates_start,dates_end,lats,lons,rank=0,nranks=1,save=Fal
     edout_ = []
     esout_ = []
     dates_ = []
-    if read == True:
-        edout = np.load(data_path + '/' + prefix + '_edout.npy')
-        esout = np.load(data_path + '/' + prefix + '_esout.npy') 
-            
 
-        return edout,esout
 
     for i in np.arange(len(dates_start))[rank::nranks]:
         atmosphere_datadir = dates_start[i].strftime('/g100_work/OGS_devC/NECCTON/OPTICS/%Y/%m')
@@ -498,6 +497,161 @@ def get_rrs_from_files(rrs_path,lats,lons,dates):
     return rrs_subsampled,rrs_std,rrs_mask
 
 
+from shapely.geometry import Point, Polygon
+
+    # Dictionary of sub-basin polygons (approximate!)
+subbasin_polygons = {
+        "Western Mediterranean": Polygon([
+            (-5.5, 35.0), (9.0, 35.0), (9.0, 43.5), (-5.5, 43.5)
+        ]),
+        "Adriatic Sea": Polygon([
+            (12.0, 39.5), (20.0, 39.5), (20.0, 45.8), (12.0, 45.8)
+        ]),
+        "Ionian Sea": Polygon([
+            (14.0, 34.0), (22.0, 34.0), (22.0, 40.0), (14.0, 40.0)
+        ]),
+        "Aegean Sea": Polygon([
+            (22.0, 35.0), (28.0, 35.0), (28.0, 41.0), (22.0, 41.0)
+        ]),
+        "Levantine Basin": Polygon([
+            (28.0, 30.0), (36.0, 30.0), (33.0, 33.5), (28.0, 36.5)
+        ]),
+        "Tyrrhenian Sea": Polygon([
+            (8.5, 38.0), (15.5, 38.0), (15.5, 42.5), (8.5, 42.5)
+        ]),
+        "Alboran Sea": Polygon([
+            (-5.5, 35.0), (0.5, 35.0), (0.5, 37.5), (-5.5, 37.5)
+        ]),
+        "Balearic Sea": Polygon([
+            (0.5, 37.5), (6.5, 37.5), (6.5, 41.5), (0.5, 41.5)
+        ]),
+        "Central Mediterranean": Polygon([
+            (10.0, 33.0), (22.0, 33.0), (22.0, 38.0), (10.0, 38.0)
+        ]),
+        "BOUSSOLE": Polygon([
+            (6.5, 42.0), (9.5, 42.0), (9.5, 45), (6.5, 45)
+        ])
+    }
+
+def get_subbasin_mask(lats, lons, subbasin_name):
+    """
+    Returns a boolean mask for points in the specified Mediterranean sub-basin using polygon boundaries.
+
+    Parameters:
+        lats (np.ndarray): Array of latitudes (N,)
+        lons (np.ndarray): Array of longitudes (N,)
+        subbasin_name (str): Name of the sub-basin
+
+    Returns:
+        np.ndarray: Boolean mask array of shape (N,)
+    """
+
+    if (subbasin_name not in subbasin_polygons) :
+        if type(subbasin_name) == int:
+            names = ["Western Mediterranean","Adriatic Sea","Ionian Sea","Aegean Sea","Levantine Basin","Tyrrhenian Sea","Alboran Sea","Balearic Sea","Central Mediterranean","BOUSSOLE"]
+            subbasin_name = names[subbasin_name]
+        else:
+            raise ValueError(f"Unknown sub-basin: {subbasin_name}")
+
+
+    polygon = subbasin_polygons[subbasin_name]
+    
+    # Normalize longitudes to [-180, 180]
+    lons = ((lons + 180) % 360) - 180
+
+    # Generate mask by checking if each point is inside the polygon
+    mask = np.array([polygon.contains(Point(lon, lat)) for lat, lon in zip(lats, lons)])
+
+    return mask
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+from matplotlib.patches import Polygon as MplPolygon
+
+def plot_mediterranean_polygon_with_points(subbasin_name, lats=None, lons=None,ax=None,batimetry=None):
+    """
+    Plots a Mediterranean map using Basemap, with a sub-basin polygon and optional data points.
+
+    Parameters:
+        subbasin_name (str): Name of the sub-basin to highlight.
+        lats (np.ndarray): Optional array of latitudes.
+        lons (np.ndarray): Optional array of longitudes.
+    """
+    # Define polygon boundaries (approximated)
+    subbasin_polygons = {
+        "Western Mediterranean": [(-5.5, 35.0), (9.0, 35.0), (9.0, 43.5), (-5.5, 43.5)],
+        "Adriatic Sea": [(12.0, 39.5), (20.0, 39.5), (20.0, 45.8), (12.0, 45.8)],
+        "Ionian Sea": [(14.0, 34.0), (22.0, 34.0), (22.0, 40.0), (14.0, 40.0)],
+        "Aegean Sea": [(22.0, 35.0), (28.0, 35.0), (28.0, 41.0), (22.0, 41.0)],
+        "Levantine Basin": [(28.0, 30.0), (33.0, 30.0), (33.0, 36.5), (28.0, 36.5)],
+        "Tyrrhenian Sea": [(8.5, 38.0), (15.5, 38.0), (15.5, 42.5), (8.5, 42.5)],
+        "Alboran Sea": [(-5.5, 35.0), (0.5, 35.0), (0.5, 37.5), (-5.5, 37.5)],
+        "Balearic Sea": [(0.5, 37.5), (6.5, 37.5), (6.5, 41.5), (0.5, 41.5)],
+        "Central Mediterranean": [(10.0, 33.0), (22.0, 33.0), (22.0, 38.0), (10.0, 38.0)],
+        "BOUSSOLE": [ (6.5, 42.0), (9.5, 42.0), (9.5, 45), (6.5, 45)]
+    }
+    if (subbasin_name not in subbasin_polygons) :
+        if type(subbasin_name) == int:
+            names = ["Western Mediterranean","Adriatic Sea","Ionian Sea","Aegean Sea","Levantine Basin","Tyrrhenian Sea","Alboran Sea","Balearic Sea","Central Mediterranean","BOUSSOLE"]
+            subbasin_name = names[subbasin_name]
+        else:
+            raise ValueError(f"Unknown sub-basin: {subbasin_name}")
+    
+    poly_coords = subbasin_polygons[subbasin_name]
+
+    # Setup map
+    m = Basemap(
+        projection='cyl',
+        llcrnrlon=poly_coords[0][0]-1,   
+        urcrnrlon=poly_coords[1][0]+2,
+        llcrnrlat=poly_coords[0][1]-2,
+        urcrnrlat=poly_coords[2][1]+1,
+        resolution='i',
+        ax=ax
+    )
+
+    m.drawcoastlines()
+    m.drawcountries()
+    m.drawmapboundary(fill_color='lightblue')
+    m.fillcontinents(color='lightgray', lake_color='lightblue')
+    m.drawparallels(np.arange(30, 47, 2), labels=[1, 0, 0, 0],fontsize=20)
+    m.drawmeridians(np.arange(-10, 39, 5), labels=[0, 0, 0, 1],fontsize=20)
+    
+    
+
+    # Draw polygon
+    polygon_pts = [(lon, lat) for lon, lat in poly_coords]
+    poly = MplPolygon(polygon_pts, closed=True, edgecolor='red', facecolor='red', alpha=0.15, linewidth=2)
+    ax.add_patch(poly)
+    ax.plot(*zip(*polygon_pts), color='red')
+
+    # Plot points if provided
+    if lats is not None and lons is not None:
+        lons = np.asarray(lons)
+        lats = np.asarray(lats)
+        x, y = m(lons, lats)
+        m.scatter(x, y, s=70, marker = 'x' ,c='black', label='Data points', zorder=5)
+
+    if type(batimetry) != type(None):
+
+        def fmt(x):
+            s = f"{x:.1f}"
+            if s.endswith("0"):
+                s = f"{x:.0f}"
+            return rf"{s} m" if plt.rcParams["text.usetex"] else f"{s} m"
+        CS = m.contour(batimetry['lon'][:], batimetry['lat'][:], batimetry['depth'][:], levels=4, linewidths=0.5, colors='k',ls='--')
+        
+        ax.clabel(CS, CS.levels, fmt=fmt, fontsize=10)
+        
+    ax.tick_params(axis="y", labelsize=40)
+    ax.tick_params(axis="x", labelsize=40)
+    ax.text(poly_coords[0][0]-1,poly_coords[2][1]+1.05,'(A)',fontsize=25)
+    #ax.set_title(f"{subbasin_name}")
+    #ax.legend()
+    ax.grid(True)
+
+
+
 if __name__ == '__main__':
 
     #Im using mpi to compute multiple points at the same time, each with different cores. 
@@ -579,10 +733,14 @@ if __name__ == '__main__':
     lats = np.load('lats.npy')
     lons = np.load('lons.npy')
     chla_data = np.load('chla_data.npy')
+    depths = np.load('depths.npy')
 
     rrs_std = np.load('rrs_std.npy')
     chla_mask = np.load('chla_mask.npy')
     rrs_mask = np.load('rrs_mask.npy')
+    print('data loaded')
+
+    #rrs_mask = rrs_mask | np.array([(chla_data<0.1)]*5).T
         
     dates = np.ma.array(dates,mask = chla_mask)
     rrs_subsampled = np.ma.array(rrs_subsampled,mask = rrs_mask)
@@ -590,6 +748,7 @@ if __name__ == '__main__':
     lons = np.ma.array(lons,mask = chla_mask)
     chla_data = np.ma.array(chla_data,mask = chla_mask)
     rrs_std = np.ma.array(rrs_std,mask = rrs_mask)
+    depths = np.ma.array(depths,mask = chla_mask)
     len_data = len(lats.compressed())
 
     dates_start = np.array([datetime(year=date.year,month=date.month,day=date.day,hour=7) for date in dates.compressed()])
@@ -597,7 +756,7 @@ if __name__ == '__main__':
     dates_end = np.array([datetime(year=date.year,month=date.month,day=date.day,hour=16) for date in dates.compressed()])
 
     #edout,esout = generate_oasim_list(dates_start[:],dates_end[:],lats.compressed()[:],lons.compressed()[:],rank=rank,nranks=nranks,read=False,save=True,data_path = '/g100_work/OGS23_PRACE_IT/csoto/diim_matches')
-    edout,esout = generate_oasim_list(dates_start[:],dates_end[:],lats.compressed()[:],lons.compressed()[:],rank=rank,nranks=nranks,read=True,data_path = '/g100_work/OGS23_PRACE_IT/csoto/diim_matches')
+    edout,esout = generate_oasim_list(dates_start[:],dates_end[:],lats.compressed()[:],lons.compressed()[:],rank=rank,nranks=nranks,read=True,data_path = './')
 
     dates_mask = np.array([False if date > datetime(year=1999,day=1,month=1) else True for date in dates_start])
 
@@ -611,9 +770,9 @@ if __name__ == '__main__':
     #lats_mask = (lats < 42.18) | (lats > 44.58) #proxi for liguria
     #lons_mask = (lons < 6.08) | (lons > 10.91)
     #
+    
     lats = lats[~(dates_mask | lats_mask | lons_mask)][:N]
     lons = lons[~(dates_mask | lats_mask | lons_mask)][:N]
-    
     edout = edout[~(dates_mask| lats_mask | lons_mask)][:N]
     esout = esout[~(dates_mask| lats_mask | lons_mask)][:N]
     dates = dates.compressed()[~(dates_mask| lats_mask | lons_mask)][:N]
@@ -621,22 +780,24 @@ if __name__ == '__main__':
     rrs_subsampled = rrs_subsampled.data[~chla_data.mask][~(dates_mask| lats_mask | lons_mask)][:N]
     rrs_std = rrs_std.data[~chla_data.mask][~(dates_mask| lats_mask | lons_mask)][:N]
     chla_data = chla_data.compressed()[~(dates_mask| lats_mask | lons_mask)][:N]
+    depths = depths.compressed()[~(dates_mask| lats_mask | lons_mask)][:N]
+    
     
 
-    wavelengths_file = '/g100_work/OGS23_PRACE_IT/csoto/DIIM/extern/OASIM_ATM/test/data/bin.txt'
+    wavelengths_file = 'bin.txt'
     wl = pd.read_csv(wavelengths_file, delim_whitespace=True, header=None).to_numpy()
     wl = np.mean(wl,1).astype(int)
-    par = dm.PAR_calculator(wl,edout.T,esout.T,folder = '/g100_work/OGS23_PRACE_IT/csoto/diim_matches',save=False,read=True,filename_date=False,filename='par.npy').T
+    par = dm.PAR_calculator(wl,edout.T,esout.T,folder = './',save=False,read=True,filename_date=False,filename='par.npy').T
     
     if rank == 0:
-        if os.path.exists('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/zenith.npy'):
-            zenith = np.load('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/zenith.npy')
+        if os.path.exists('zenith.npy'):
+            zenith = np.load('zenith.npy')
         else:
             zenith = np.array([ dm.get_solar_position(dates[i],lats[i],lons[i],save=False,read=False) for i in range(len(dates)) ])
-            np.save('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/zenith.npy',zenith)
+            np.save('zenith.npy',zenith)
     comm.Barrier()
     if rank != 0:
-        zenith = np.load('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/zenith.npy')
+        zenith = np.load('zenith.npy')
     
     
     #rrs_ = rrs_subsampled.copy()
@@ -646,12 +807,12 @@ if __name__ == '__main__':
     #rrs_subsampled[2,3] = rrs_[2,1]
     #rrs_subsampled[2,4] = rrs_[2,0]
 
-    if os.path.exists('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_log.npy'):
-        chla_log = np.load('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_log.npy')
-        chla_NN = np.load('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_NN.npy')
-        RRS_log = np.load('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/RRS_log.npy')
+    if os.path.exists('chla_log.npy'):
+        chla_log = np.load('chla_log.npy')
+        chla_NN = np.load('chla_NN.npy')
+        RRS_log = np.load('RRS_log.npy')
     else:
-        constant = rdm.read_constants(file1='/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/cte_lambda_dukiewicz/cte_lambda.csv',file2='/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/cte.csv')
+        constant = rdm.read_constants(file1='g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/cte_lambda_dukiewicz/cte_lambda.csv',file2='/g100_work/OGS23_PRACE_IT/csoto/DIIM/settings/cte.csv')
         
         output = diim_list(rrs_subsampled[:],par[:],zenith[:],esout[:],edout[:],wl,dates[:],lons[:],lats[:],constant=constant,rank=rank,nranks=nranks,save = True)
         if rank == 0:
@@ -659,13 +820,224 @@ if __name__ == '__main__':
         comm.Barrier()
         chla_log = np.load('/g100_work/OGS23_PRACE_IT/csoto/diim_matches/chla_log.npy')
 
-    chla_data_inverted = np.exp(chla_log[:,0])
+    chla_data_inverted = np.exp(chla_NN[:,0])
 
-    corr = np.corrcoef(chla_data,chla_data_inverted)
-    import matplotlib.pyplot as plt
-    plt.plot(chla_data,chla_data_inverted)
-    plt.show()
 
+
+    
+    ###########################################################################################################
+    ###########################################flag for batimetry depth and season#############################
+    ###########################################################################################################
+    if os.path.exists('batimetry.npy'):
+        batimetry = np.load('batimetry.npy')
+    else:
+        batimetry = nc.Dataset('depth.nc')
+
+        def depth_lan_lot(lat,lon):
+            lat_inf = np.argwhere( (batimetry['lat'][:,0] <= lat) )[-1]
+            lat_sup = np.argwhere( (batimetry['lat'][:,0] > lat) )[0]
+
+            lon_inf = np.argwhere( (batimetry['lon'][0,:] <= lon) )[-1]
+            lon_sup = np.argwhere( (batimetry['lon'][0,:] > lon) )[0]
+
+            mean_depth = (batimetry['depth'][lat_inf,lon_inf] + batimetry['depth'][lat_inf,lon_sup]+\
+                          batimetry['depth'][lat_sup,lon_inf] + batimetry['depth'][lat_sup,lon_sup])/4
+            return mean_depth[0,0]
+
+        batimetry_npy = []
+        for lat_i, lon_i in zip(lats,lons):
+            batimetry_npy.append(depth_lan_lot(lat_i,lon_i))
+        batimetry_npy = np.array(batimetry_npy)
+        np.save('batimetry.npy',batimetry_npy)
+        batimetry = batimetry_npy
+
+
+    batimetry_mask = (batimetry < 400)
+    depth_mask = (depths > 10)
+    chla_mask = (chla_data<0)
+    
+    chla_data = chla_data[(~batimetry_mask) & (~depth_mask) & (~chla_mask)]
+    depths = depths[(~batimetry_mask) & (~depth_mask)& (~chla_mask)]
+    dates = dates[(~batimetry_mask) & (~depth_mask)& (~chla_mask)]
+    chla_data_inverted = chla_data_inverted[(~batimetry_mask) & (~depth_mask)& (~chla_mask)]
+    batimetry = batimetry[(~batimetry_mask) & (~depth_mask)& (~chla_mask)]
+    rrs_subsampled = rrs_subsampled[(~batimetry_mask) & (~depth_mask)& (~chla_mask)]
+    lats = lats[(~batimetry_mask) & (~depth_mask)& (~chla_mask)]
+    lons = lons[(~batimetry_mask) & (~depth_mask)& (~chla_mask)]
+
+    ##########SeaWiFS maximum with ratio#########
+    max_rrs = np.array([np.max([rrs1,rrs2,rrs3]) for rrs1,rrs2,rrs3 in zip(rrs_subsampled[:,1],rrs_subsampled[:,2],rrs_subsampled[:,3])])
+    X = np.log(max_rrs/rrs_subsampled[:,4])/np.log(10)
+    X_2 = X**2
+    X_3 = X**3
+    X_4 = X**4
+    
+    #from sklearn import linear_model
+    
+    X = np.array([X,X_2,X_3,X_4]).T
+    y = np.log(chla_data)/np.log(10)
+    #regr = linear_model.LinearRegression()
+    #regr.fit(X[~train_mask], y[~train_mask])
+    
+    #chla_data_inverted = chla_seaWiFS
+    def rmse(x1,x2):
+        return np.sqrt( np.mean((x1 - x2)**2) )        
+
+    #chla_seaWiFS = 10**(regr.predict(X[(~test_mask)&(~chla_mask)]))
+    chla_seaWiFS = 10**(0.327 - 2.994*X[:,0] + 2.722*X[:,1] -1.226 * X[:,2] -0.568 * X[:,3])
+    
+    spring_mask = ~np.array([(date.month in [3,4,5]) for date in dates ])
+    summer_mask = ~np.array([(date.month in [6,7,8]) for date in dates ])
+    autum_mask = ~np.array([(date.month in [9,10,11]) for date in dates ])
+    winter_mask = ~np.array([(date.month in [12,1,2]) for date in dates ])
+    
+    for subbasin_name in range(9,10):
+        subbasin_mask =  ~(get_subbasin_mask(lats, lons, subbasin_name)) 
+    #subbasin_name = 1
+        #chla_mask = ((chla_data>2.5) & (chla_data_inverted<0.75)) | ~(get_subbasin_mask(lats, lons, subbasin_name))
+        #corr = np.corrcoef(chla_data,chla_data_inverted)
+        import matplotlib.pyplot as plt
+        #print('spring')
+        #print('rrs_seaWiFS',rmse(chla_seaWiFS[~spring_mask],chla_data[~spring_mask]))
+        #print('rrs_inverted',rmse(chla_data_inverted[~spring_mask],chla_data[~spring_mask]))
+        #print('summer')
+        #print('rrs_seaWiFS',rmse(chla_seaWiFS[~summer_mask],chla_data[~summer_mask]))
+        #print('rrs_inverted',rmse(chla_data_inverted[~summer_mask],chla_data[~summer_mask]))
+        #print('winter')
+        #print('rrs_seaWiFS',rmse(chla_seaWiFS[~winter_mask],chla_data[~winter_mask]))
+        #print('rrs_inverted',rmse(chla_data_inverted[~winter_mask],chla_data[~winter_mask]))
+        #print('autum')
+        #print('rrs_seaWiFS',rmse(chla_seaWiFS[~autum_mask],chla_data[~autum_mask]))
+        #print('rrs_inverted',rmse(chla_data_inverted[~autum_mask],chla_data[~autum_mask]))
+        """
+        plt.close('all')
+        fig = plt.figure(figsize=(30,8))
+        
+        ax1 = plt.subplot2grid((2, 6), (0, 0),rowspan=2,colspan=2)
+        
+        ax2 = plt.subplot2grid((2, 6), (0, 2))
+        ax3 = plt.subplot2grid((2, 6), (0, 3))
+        ax4 = plt.subplot2grid((2, 6), (0, 4))
+        ax5 = plt.subplot2grid((2, 6), (0, 5))
+        axs1 = [ax2,ax3,ax4,ax5]
+        
+        ax6 = plt.subplot2grid((2, 6), (1, 2))
+        ax7 = plt.subplot2grid((2, 6), (1, 3))
+        ax8 = plt.subplot2grid((2, 6), (1, 4))
+        ax9 = plt.subplot2grid((2, 6), (1, 5))
+        axs2 = [ax6,ax7,ax8,ax9]
+        
+        
+        plot_mediterranean_polygon_with_points(subbasin_name,lats[~subbasin_mask],lons[~subbasin_mask],ax=ax1)
+        
+        axs = axs1
+        
+        axs[0].scatter(chla_data[(~spring_mask) & (~subbasin_mask)],chla_data_inverted[(~spring_mask) & (~subbasin_mask)],label='Spring data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~spring_mask) & (~subbasin_mask)],chla_data_inverted[(~spring_mask) & (~subbasin_mask)])[0,1]),color='purple',alpha=0.4,marker='o')
+        
+        axs[1].scatter(chla_data[(~summer_mask) & (~subbasin_mask)],chla_data_inverted[(~summer_mask) & (~subbasin_mask)],label='Summer data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~summer_mask) & (~subbasin_mask)],chla_data_inverted[(~summer_mask) & (~subbasin_mask)])[0,1]),color='orange',alpha=0.4,marker = 'x')
+        
+        axs[2].scatter(chla_data[(~autum_mask) & (~subbasin_mask)],chla_data_inverted[(~autum_mask) & (~subbasin_mask)],label='Autum data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~autum_mask) & (~subbasin_mask)],chla_data_inverted[(~autum_mask) & (~subbasin_mask)])[0,1]),color='red',alpha=0.4,marker='1')
+        
+        axs[3].scatter(chla_data[(~winter_mask) & (~subbasin_mask)],chla_data_inverted[(~winter_mask) & (~subbasin_mask)],label='Winter data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~winter_mask) & (~subbasin_mask)],chla_data_inverted[(~winter_mask) & (~subbasin_mask)])[0,1]),color='blue',alpha=0.4,marker='+')
+        
+        for ax in axs:
+            ax.set_xlabel('chlorophyll observations $[mgm^{-1}]$')
+            ax.set_ylabel('chlorophyll inverted $[mgm^{-1}]$')
+            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black',label='x=y')
+            ax.legend()
+        axs[0].set_xlim(0,3)
+        axs[0].set_ylim(0,3)
+        
+        axs[1].set_xlim(0,1)
+        axs[1].set_ylim(0,1)
+        
+        axs[2].set_xlim(0,1)
+        axs[2].set_ylim(0,1)
+        
+        axs[3].set_xlim(0,1.5)
+        axs[3].set_ylim(0,1.5)
+            
+        axs = axs2
+            
+        axs[0].scatter(chla_data[(~spring_mask) & (~subbasin_mask)],chla_seaWiFS[(~spring_mask) & (~subbasin_mask)],label='Spring data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~spring_mask) & (~subbasin_mask)],chla_seaWiFS[(~spring_mask) & (~subbasin_mask)])[0,1]),color='purple',alpha=0.4,marker='o')
+        
+        axs[1].scatter(chla_data[(~summer_mask) & (~subbasin_mask)],chla_seaWiFS[(~summer_mask) & (~subbasin_mask)],label='Summer data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~summer_mask) & (~subbasin_mask)],chla_seaWiFS[(~summer_mask) & (~subbasin_mask)])[0,1]),color='orange',alpha=0.4,marker = 'x')
+        
+        axs[2].scatter(chla_data[(~autum_mask) & (~subbasin_mask)],chla_seaWiFS[(~autum_mask) & (~subbasin_mask)],label='Autum data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~autum_mask) & (~subbasin_mask)],chla_seaWiFS[(~autum_mask) & (~subbasin_mask)])[0,1]),color='red',alpha=0.4,marker='1')
+        
+        axs[3].scatter(chla_data[(~winter_mask) & (~subbasin_mask)],chla_seaWiFS[(~winter_mask) & (~subbasin_mask)],label='Winter data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~winter_mask) & (~subbasin_mask)],chla_seaWiFS[(~winter_mask) & (~subbasin_mask)])[0,1]),color='blue',alpha=0.4,marker='+')
+        
+        for ax in axs:
+            ax.set_xlabel('chlorophyll observations $[mgm^{-1}]$')
+            ax.set_ylabel('chlorophyll seaWiFS $[mgm^{-1}]$')
+            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black',label='x=y')
+            ax.legend(fontsize=20)
+        axs[0].set_xlim(0,3)
+        axs[0].set_ylim(0,3)
+
+        axs[1].set_xlim(0,1)
+        axs[1].set_ylim(0,1)
+        
+        axs[2].set_xlim(0,1)
+        axs[2].set_ylim(0,1)
+
+        axs[3].set_xlim(0,1.5)
+        axs[3].set_ylim(0,1.5)
+        plt.tight_layout()
+        plt.savefig('/home/carlos/Documents/TriesteUniversity/diim_matches/'+list(subbasin_polygons.keys())[subbasin_name]+'.png')
+    """
+        
+        plt.close('all')
+        fig = plt.figure(figsize=(16,8))
+        
+        ax1 = plt.subplot2grid((2, 2), (0, 0),rowspan=2,colspan=1)
+        
+        ax2 = plt.subplot2grid((2, 2), (0, 1))
+
+        axs1 = [ax2]
+        
+        ax6 = plt.subplot2grid((2, 2), (1, 1))
+
+        axs2 = [ax6]
+        
+        batimetry_nc = nc.Dataset('depth.nc')
+        plot_mediterranean_polygon_with_points(subbasin_name,lats[~subbasin_mask],lons[~subbasin_mask],ax=ax1,batimetry=batimetry_nc)
+        
+        axs = axs1
+        
+        axs[0].scatter(chla_data[ (~subbasin_mask)],chla_data_inverted[ (~subbasin_mask)],label='Spring data, corr: {:.3f}'.format(np.corrcoef(chla_data[ (~subbasin_mask)],chla_data_inverted[ (~subbasin_mask)])[0,1]),color='#004D40',alpha=0.4,marker='o')
+        
+        for ax in axs:
+            #ax.set_xlabel('chlorophyll observations $[mgm^{-1}]$',fontsize=20)
+            ax.set_ylabel('chlorophyll inverted $[mgm^{-1}]$',fontsize=15)
+            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black',label='x=y')
+            ax.legend(fontsize=20)
+            ax.tick_params(axis="x", labelsize=20)
+            ax.tick_params(axis="y", labelsize=20)
+        axs[0].set_xlim(0,3)
+        axs[0].set_xticks([])
+        axs[0].set_ylim(0,3)
+        axs[0].text(-0.6,3.1,'(B)',fontsize=25)
+            
+        axs = axs2
+            
+        axs[0].scatter(chla_data[(~subbasin_mask)],chla_seaWiFS[ (~subbasin_mask)],label='Spring data, corr: {:.3f}'.format(np.corrcoef(chla_data[ (~subbasin_mask)],chla_seaWiFS[ (~subbasin_mask)])[0,1]),color='#1E88E5',alpha=0.4,marker='o')
+               
+        for ax in axs:
+            ax.set_xlabel('chlorophyll observations $[mgm^{-1}]$',fontsize=20)
+            ax.set_ylabel('chlorophyll MedOC4.2020 $[mgm^{-1}]$',fontsize=15)
+            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black',label='x=y')
+            ax.legend(fontsize=20)
+            ax.tick_params(axis="x", labelsize=20)
+            ax.tick_params(axis="y", labelsize=20)
+        axs[0].set_xlim(0,3)
+        axs[0].set_ylim(0,3)
+        axs[0].text(-0.6,3.1,'(C)',fontsize=25)
+
+        plt.tight_layout()
+        plt.savefig(list(subbasin_polygons.keys())[subbasin_name]+'.pdf')
+
+    
     
                                         
                          

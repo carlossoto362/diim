@@ -87,7 +87,7 @@ def read_second_run(second_run_path,include_uncertainty=False,abr='output',name_
 
 
 
-def plot_parallel(data,columns,names,labels,statistics = True,histogram=True,figsize=(30,17),date_init = None,\
+def plot_parallel(data,columns,names,labels,statistics = True,histogram=True,figsize=(35,17),date_init = None,\
                   date_end = None, shadow_error = False,num_cols = 2,figname = 'fig.png',fontsize=15,colors = 1,save=True,indexes=[],ylim=[],legend_fontsize=15,s=2,log_scale = False):
     if colors == 1:
         colors_palet = ['#377eb8','blue']
@@ -108,9 +108,9 @@ def plot_parallel(data,columns,names,labels,statistics = True,histogram=True,fig
 
     
     if histogram == True:
-        fig,axs = plt.subplots(num_plots,num_cols*2,width_ratios = [2.5/num_cols,1/num_cols]*num_cols,figsize = figsize,tight_layout=True)
+        fig,axs = plt.subplots(num_plots,num_cols*2,width_ratios = [2.5/num_cols,1/num_cols]*num_cols,figsize = figsize,constrained_layout=True)
     else:
-        fig,axs = plt.subplots(num_plots,num_cols,figsize = figsize,tight_layout=True)
+        fig,axs = plt.subplots(num_plots,num_cols,figsize = figsize,constrained_layout=True)
 
     k = 0
     for j in range(num_cols):
@@ -225,8 +225,10 @@ def plot_parallel(data,columns,names,labels,statistics = True,histogram=True,fig
                         else:
                             data_plot = data_use[column[1]][~data_use[column[0]].isnull()]
                         ax.hist(data_plot,bins=20,label=labels[k][3],alpha=0.5,density=True,color=colors_palet[0],edgecolor=colors_palet[1])
-                        
-                ax.legend(loc='upper right',fontsize=legend_fontsize)
+
+                #if i == 0:
+                #    ax.legend(loc=(1,0.5),fontsize=2*legend_fontsize)
+                
                 ax.tick_params(axis='x', labelsize=fontsize)
                 ax.tick_params(axis='y', labelsize=fontsize)
             if column[0].split('_')[0] == 'kd':
@@ -238,7 +240,10 @@ def plot_parallel(data,columns,names,labels,statistics = True,histogram=True,fig
             if column[0].split('_')[0] == 'bbp':
                 ax.set_ylim(1e-4,0.005)
                 #ax.set_yscale('log')
-            ax.legend(fontsize=legend_fontsize,markerscale=3.)
+                
+            #box = ax.get_position()
+            #ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+                
             if len(indexes)>0:
                 ax.text(-0.03,1.13,indexes[k],transform = ax.transAxes,fontsize=fontsize)
                 
@@ -251,7 +256,10 @@ def plot_parallel(data,columns,names,labels,statistics = True,histogram=True,fig
 
             if log_scale == True:
                 ax.set_yscale('log')
-    fig.tight_layout()
+
+    fig.legend(loc='outside right center',fontsize=1.3*legend_fontsize,markerscale=5.)
+    #fig.tight_layout()
+    
     if save == True:
         
         plt.savefig(figname)
@@ -295,7 +303,10 @@ def plot_kd(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognormal
     for i,lam in enumerate(lambdas_names):
         columns.append(('kd_'+ lam,'kd_output_' + lam,'delta_kd_output_'+lam,'kd_outputVAE_'+lam))
         names.append('$kd_{'+lambdas_values[i]+'}$ $[\mathrm{m}^{-1}$]')
-        labels.append((*labels_names,*labels_names,'Observation operator with NN inuts'))
+        if i == 0:
+            labels.append((*labels_names,*labels_names,'Observation\nwith\nSGVB'))
+        else:
+            labels.append((None,None,None))
 
 
     plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = False,num_cols=num_cols,\
@@ -335,7 +346,10 @@ def plot_bbp(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognorma
         if (i == 1) or (i == 2) or (i ==4):
             columns.append(('bbp_'+ lam,'bbp_output_' + lam,'delta_bbp_output_'+lam,'bbp_outputVAE_' + lam))
             names.append('$b_{b,p,'+lambdas_values[i]+'}$ $[m^{-1}]$')
-            labels.append((*labels_names,*labels_names,'Observation operator with NN inputs'))
+            if i == 1:
+                labels.append((*labels_names,*labels_names,'Observation\nwith\nSGVB'))
+            else:
+                labels.append((None,None,None))
 
     plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = False,num_cols=num_cols,\
                   figname = figname,fontsize=25,colors = 1,save=save,figsize = figsize,indexes = indexes,ylim=ylim,log_scale = log_scale)
@@ -373,15 +387,17 @@ def plot_chla(input_data_path = MODEL_HOME + '/experiments/results_bayes_lognorm
     
     columns.append(('chla','chla_output','delta_chla_output','chla_outputVAE'))
     names.append('$\mathrm{Chl-a }$ $[\mathrm{mg}\mathrm{m}^{-3}]$')
-    labels.append((*labels_names,*labels_names,'Neural Network approximation'))
+    labels.append((*labels_names,*labels_names,'SGVB'))
 
     columns.append(('NAP','NAP_output','delta_NAP_output','NAP_outputVAE'))
     names.append('$\mathrm{NAP }$ $[\mathrm{mg} \mathrm{m}^{-3}]$')
-    labels.append((*labels_names,*labels_names,'Neural Network approximation'))
+    #labels.append((*labels_names,*labels_names,'Neural Network approximation'))
+    labels.append((None,None,None))
 
     columns.append(('CDOM','CDOM_output','delta_CDOM_output','CDOM_outputVAE'))
     names.append('$\mathrm{CDOM }$ $[\mathrm{mg}\mathrm{m}^{-3}]$')
-    labels.append((*labels_names,*labels_names,'Neural Network approximation'))
+    #labels.append((*labels_names,*labels_names,'Neural Network approximation'))
+    labels.append((None,None,None))
 
     plot_parallel(data,columns,names,labels,statistics = statistics,histogram=False,date_init = date_init,shadow_error = False,num_cols=num_cols,\
                   figname = figname,fontsize=25,colors = 1,save=save,figsize = figsize,indexes = indexes,ylim=ylim,log_scale = log_scale)
@@ -773,17 +789,17 @@ def plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_pat
 
     plot_chla(input_data_path = results_path + '/' +results_name_timeline,\
               figname = plots_path + '/chla'+output_plot_prefix+'.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
-              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
+              statistics=False, num_cols = 1,labels_names=['In situ','MAP'],ylim=[],figsize=(17,12),\
               third_data_path = results_path + '/results_VAE_VAEparam_chla',log_scale=True)
 
     plot_kd(input_data_path = results_path + '/' + results_name_timeline,\
               figname = plots_path + '/kd'+output_plot_prefix+'.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
-              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
+              statistics=False, num_cols = 1,labels_names=['In situ','MAP'],ylim=[],figsize=(17,12),\
               third_data_path = results_path + '/results_VAE_VAEparam_chla',log_scale=True)
 
     plot_bbp(input_data_path = results_path + '/' + results_name_timeline,\
               figname = plots_path +'/bbp'+output_plot_prefix+'.pdf',save=True,date_init = datetime(year=2005,month=1,day=1),\
-              statistics=False, num_cols = 1,labels_names=['In situ data','Bayesian MAP output and Uncertainty'],ylim=[],figsize=(17,12),\
+              statistics=False, num_cols = 1,labels_names=['In situ','MAP'],ylim=[],figsize=(17,12),\
               third_data_path = results_path + '/results_VAE_VAEparam_chla',log_scale=True)
     
     plot_constants_2(perturbation_path = perturbation_factors_path,save_path =  plots_path,constants_path1=constants_path1)
@@ -926,10 +942,10 @@ if __name__ == "__main__":
     
     #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_name_timeline='/results_lognormal_mcmc',output_plot_prefix='_lognormal_mcmc',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
     
-    #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_name_timeline='/results_lognormal_VAEparam',output_plot_prefix='_lognormal_VAEparam',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
+    plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce_dukiewicz',plots_path = MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_name_timeline='/results_lognormal_VAEparam',output_plot_prefix='_lognormal_VAEparam',perturbation_factors_path = HOME_PATH + '/settings/reproduce_dukiewicz/perturbation_factors',constants_path1 = MODEL_HOME + '/settings/cte_lambda_dukiewicz')
 
 
-    print_statistics(perturbation_factors_path= MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors',save_path=MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_path = MODEL_HOME + '/settings/reproduce_dukiewicz')
+    #print_statistics(perturbation_factors_path= MODEL_HOME + '/settings/reproduce_dukiewicz/perturbation_factors',save_path=MODEL_HOME + '/settings/reproduce_dukiewicz/plots',results_path = MODEL_HOME + '/settings/reproduce_dukiewicz')
 
 
     #plot_all(settings_npy_data_path=HOME_PATH + '/settings/npy_data',results_path=MODEL_HOME + '/settings/reproduce',plots_path = MODEL_HOME + '/settings/reproduce/plots',results_name_timeline='/results_unperturbed',output_plot_prefix='_lognormal_unperturbed',perturbation_factors_path = HOME_PATH + '/settings/reproduce/perturbation_factors',constants_path1 = MODEL_HOME + '/settings')

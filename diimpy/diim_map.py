@@ -118,7 +118,7 @@ def integrate_par(Edif,Edir,wl,irange,ilen,constant_,n_hour_average=10):
     PAR_ = PAR_  * constant_*(n_hour_average/24) #10/24 is because i used edir average over 10 hours, but i want the daily average, approximating Edif and edif of the remaining hours equal to zero. 
     return PAR_
     
-def PAR_calculator(wl,Edir,Edif,time_utc=datetime.utcnow(),folder = '.',dateformat = '%Y%m%d-%H:%M:%S',save=True,read=True,filename_date=True,filename=''):
+def PAR_calculator(wl,Edir,Edif,time_utc=datetime.utcnow(),folder = '.',dateformat = '%Y%m%d-%H:%M:%S',save=True,read=True,filename_date=True,filename='',n_hour_average = 10):
 
     if filename_date == True:
         filename = 'PAR_'+datetime.strftime(time_utc + timedelta(hours=1),dateformat ) + '.npy'
@@ -135,7 +135,7 @@ def PAR_calculator(wl,Edir,Edif,time_utc=datetime.utcnow(),folder = '.',dateform
     irange = ((wl>401) & (wl<699))
     ilen = len(wl[irange])
 
-    PAR_ = integrate_par(Edif,Edir,wl,irange,ilen,constant_)
+    PAR_ = integrate_par(Edif,Edir,wl,irange,ilen,constant_,n_hour_average=n_hour_average)
 
     if save == True:
         np.save(folder + '/' + filename,PAR_)

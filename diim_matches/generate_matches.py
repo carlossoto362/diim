@@ -588,7 +588,7 @@ def plot_mediterranean_polygon_with_points(subbasin_name, lats=None, lons=None,a
         "Alboran Sea": [(-5.5, 35.0), (0.5, 35.0), (0.5, 37.5), (-5.5, 37.5)],
         "Balearic Sea": [(0.5, 37.5), (6.5, 37.5), (6.5, 41.5), (0.5, 41.5)],
         "Central Mediterranean": [(10.0, 33.0), (22.0, 33.0), (22.0, 38.0), (10.0, 38.0)],
-        "BOUSSOLE": [ (6.5, 42.0), (9.5, 42.0), (9.5, 45), (6.5, 45)]
+        "BOUSSOLE": [ (6.5, 42.0), (9.5, 42.0), (9.5, 45), (6.5, 45),(6.5, 42.0)]
     }
     if (subbasin_name not in subbasin_polygons) :
         if type(subbasin_name) == int:
@@ -615,7 +615,7 @@ def plot_mediterranean_polygon_with_points(subbasin_name, lats=None, lons=None,a
     m.drawmapboundary(fill_color='lightblue')
     m.fillcontinents(color='lightgray', lake_color='lightblue')
     m.drawparallels(np.arange(30, 47, 2), labels=[1, 0, 0, 0],fontsize=20)
-    m.drawmeridians(np.arange(-10, 39, 5), labels=[0, 0, 0, 1],fontsize=20)
+    m.drawmeridians(np.arange(-10, 39, 2), labels=[0, 0, 0, 1],fontsize=20)
     
     
 
@@ -645,10 +645,20 @@ def plot_mediterranean_polygon_with_points(subbasin_name, lats=None, lons=None,a
         
     ax.tick_params(axis="y", labelsize=40)
     ax.tick_params(axis="x", labelsize=40)
-    ax.text(poly_coords[0][0]-1,poly_coords[2][1]+1.05,'(A)',fontsize=25)
+    ax.text(poly_coords[0][0]-2.5,poly_coords[2][1]+1.05,'(A)',fontsize=25)
     #ax.set_title(f"{subbasin_name}")
     #ax.legend()
+    from matplotlib.patches import Rectangle
+    x_min, y_min = m(5.8, 45.6)
+    x_max, y_max = m(9.8, 46)
+    width = x_max - x_min
+    height = y_max - y_min
+    rect = Rectangle((x_min, y_min), width, height,
+                 facecolor='white', edgecolor='none', alpha=0.8, zorder=10)
+    ax1.add_patch(rect)
     ax.grid(True)
+
+
 
 
 
@@ -941,8 +951,8 @@ if __name__ == '__main__':
         axs[3].scatter(chla_data[(~winter_mask) & (~subbasin_mask)],chla_data_inverted[(~winter_mask) & (~subbasin_mask)],label='Winter data, corr: {:.3f}'.format(np.corrcoef(chla_data[(~winter_mask) & (~subbasin_mask)],chla_data_inverted[(~winter_mask) & (~subbasin_mask)])[0,1]),color='blue',alpha=0.4,marker='+')
         
         for ax in axs:
-            ax.set_xlabel('chlorophyll observations $[mgm^{-1}]$')
-            ax.set_ylabel('chlorophyll inverted $[mgm^{-1}]$')
+            ax.set_xlabel('chlorophyll observations $[mgm^{-3}]$')
+            ax.set_ylabel('chlorophyll inverted $[mgm^{-3}]$')
             ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black',label='x=y')
             ax.legend()
         axs[0].set_xlim(0,3)
@@ -988,15 +998,15 @@ if __name__ == '__main__':
     """
         
         plt.close('all')
-        fig = plt.figure(figsize=(16,8))
+        fig = plt.figure(figsize=(14,8))
         
-        ax1 = plt.subplot2grid((2, 2), (0, 0),rowspan=2,colspan=1)
+        ax1 = plt.subplot2grid((2, 3), (0, 0),rowspan=2,colspan=2)
         
-        ax2 = plt.subplot2grid((2, 2), (0, 1))
+        ax2 = plt.subplot2grid((2, 3), (0, 2))
 
         axs1 = [ax2]
         
-        ax6 = plt.subplot2grid((2, 2), (1, 1))
+        ax6 = plt.subplot2grid((2, 3), (1, 2))
 
         axs2 = [ax6]
         
@@ -1005,36 +1015,44 @@ if __name__ == '__main__':
         
         axs = axs1
         
-        axs[0].scatter(chla_data[ (~subbasin_mask)],chla_data_inverted[ (~subbasin_mask)],label='Spring data, corr: {:.3f}'.format(np.corrcoef(chla_data[ (~subbasin_mask)],chla_data_inverted[ (~subbasin_mask)])[0,1]),color='#004D40',alpha=0.4,marker='o')
+        axs[0].scatter(chla_data[ (~subbasin_mask)],chla_data_inverted[ (~subbasin_mask)],label='corr: {:.3f}'.format(np.corrcoef(chla_data[ (~subbasin_mask)],chla_data_inverted[ (~subbasin_mask)])[0,1]),color='#004D40',alpha=0.4,marker='o')
         
         for ax in axs:
             #ax.set_xlabel('chlorophyll observations $[mgm^{-1}]$',fontsize=20)
-            ax.set_ylabel('chlorophyll inverted $[mgm^{-1}]$',fontsize=15)
-            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black',label='x=y')
-            ax.legend(fontsize=20)
+            ax.set_ylabel('DIIM $[mgm^{-3}]$',fontsize=20)
+            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black')
+            ax.legend(fontsize=17,loc='lower right')
             ax.tick_params(axis="x", labelsize=20)
             ax.tick_params(axis="y", labelsize=20)
         axs[0].set_xlim(0,3)
-        axs[0].set_xticks([])
+        #axs[0].set_xticks([])
         axs[0].set_ylim(0,3)
-        axs[0].text(-0.6,3.1,'(B)',fontsize=25)
+        axs[0].text(-1,3.1,'(B)',fontsize=25)
             
         axs = axs2
             
-        axs[0].scatter(chla_data[(~subbasin_mask)],chla_seaWiFS[ (~subbasin_mask)],label='Spring data, corr: {:.3f}'.format(np.corrcoef(chla_data[ (~subbasin_mask)],chla_seaWiFS[ (~subbasin_mask)])[0,1]),color='#1E88E5',alpha=0.4,marker='o')
+        axs[0].scatter(chla_data[(~subbasin_mask)],chla_seaWiFS[ (~subbasin_mask)],label='corr: {:.3f}'.format(np.corrcoef(chla_data[ (~subbasin_mask)],chla_seaWiFS[ (~subbasin_mask)])[0,1]),color='#1E88E5',alpha=0.4,marker='o')
                
         for ax in axs:
-            ax.set_xlabel('chlorophyll observations $[mgm^{-1}]$',fontsize=20)
-            ax.set_ylabel('chlorophyll MedOC4.2020 $[mgm^{-1}]$',fontsize=15)
-            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black',label='x=y')
-            ax.legend(fontsize=20)
+            ax.set_xlabel('Observations $[mgm^{-3}]$',fontsize=20)
+            ax.set_ylabel('MedOC4.2020 $[mgm^{-3}]$',fontsize=20)
+            ax.plot(np.linspace(0,3,20),np.linspace(0,3,20),'--',color='black')
+            ax.legend(fontsize=17)
             ax.tick_params(axis="x", labelsize=20)
             ax.tick_params(axis="y", labelsize=20)
         axs[0].set_xlim(0,3)
         axs[0].set_ylim(0,3)
-        axs[0].text(-0.6,3.1,'(C)',fontsize=25)
+        axs[0].text(-1,3.1,'(C)',fontsize=25)
+        
+
+        
+        plt.text(-6.3, 6.55, "Map data from GSHHG, via Matplotlib Basemap.",
+                 ha='left', va='top', fontsize=10)
+        plt.text(-6.3, 6.39, "Bathymetry data from GEBCO Compilation Group 2024.",
+                 ha='left', va='top', fontsize=10)
 
         plt.tight_layout()
+        #plt.show()
         plt.savefig(list(subbasin_polygons.keys())[subbasin_name]+'.pdf')
 
     

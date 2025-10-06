@@ -645,7 +645,7 @@ def plot_mediterranean_polygon_with_points(subbasin_name, lats=None, lons=None,a
         
     ax.tick_params(axis="y", labelsize=40)
     ax.tick_params(axis="x", labelsize=40)
-    ax.text(poly_coords[0][0]-2.5,poly_coords[2][1]+1.05,'(A)',fontsize=25)
+    ax.text(poly_coords[0][0]-2.5,poly_coords[2][1]+1.05,'(A)',fontsize=20)
     #ax.set_title(f"{subbasin_name}")
     #ax.legend()
     from matplotlib.patches import Rectangle
@@ -1027,7 +1027,7 @@ if __name__ == '__main__':
         axs[0].set_xlim(0,3)
         #axs[0].set_xticks([])
         axs[0].set_ylim(0,3)
-        axs[0].text(-1,3.1,'(B)',fontsize=25)
+        axs[0].text(-1,3.1,'(B)',fontsize=20)
             
         axs = axs2
             
@@ -1042,7 +1042,7 @@ if __name__ == '__main__':
             ax.tick_params(axis="y", labelsize=20)
         axs[0].set_xlim(0,3)
         axs[0].set_ylim(0,3)
-        axs[0].text(-1,3.1,'(C)',fontsize=25)
+        axs[0].text(-1,3.1,'(C)',fontsize=20)
         
 
         

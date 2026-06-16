@@ -502,9 +502,9 @@ def getting_oasim_output(dateformat='%Y%m%d-%H:%M:%S',\
         ws10[it]  = np.sqrt(u10[it]*u10[it]+v10[it]*v10[it])
         
         if location == 'map':
-            Before_DATA, After__DATA = np.array(ncA.variables['tcc']).astype(np.float32),np.array(ncA.variables['tcc']).astype(np.float32)
+            Before_DATA, After__DATA = np.array(ncB.variables['tcc']).astype(np.float32),np.array(ncA.variables['tcc']).astype(np.float32)
         else:
-            Before_DATA, After__DATA = np.diagonal(ncA.variables['tcc'][ji_sel,jj_sel]).astype(np.float32),\
+            Before_DATA, After__DATA = np.diagonal(ncB.variables['tcc'][ji_sel,jj_sel]).astype(np.float32),\
                 np.diagonal(ncA.variables['tcc'][ji_sel,jj_sel]).astype(np.float32)
         tcc[it] = 100.*((1-T_interp)*Before_DATA + T_interp*After__DATA)
 
